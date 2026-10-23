@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "sourceApiVersion": 1,
+  "minRuntimeAbi": 1,
+  "id": "filmorax.source.twodhive",
+  "name": "2Dhive",
+  "description": "2Dhive catalogue and native BabaStream playback",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "publisherKeyId": "filmorax.sources",
+  "entrypoint": "src/index.mjs",
+  "permissions": ["http", "html", "settings", "crypto"],
+  "sources": [
+    {
+      "id": "twodhive",
+      "name": "2Dhive",
+      "description": "source.description.twodhive",
+      "language": "english",
+      "category": "anime",
+      "baseUrl": "https://2dhive.com",
+      "isNsfw": false,
+      "supportsTorrentSearch": true,
+      "capabilities": [
+        "catalog",
+        "search",
+        "filters",
+        "metadata",
+        "playbackGroups",
+        "recommendations",
+        "streams",
+        "headers"
+      ],
+      "parameters": {
+        "playerOrigin": "https://babastream.top",
+        "verificationOrigin": "https://hostinger.babastream.top"
+      },
+      "runtime": {
+        "resolveTimeoutMs": 60000
+      },
+      "network": {
+        "origins": [
+          "https://2dhive.com",
+          "https://babastream.top",
+          "https://hostinger.babastream.top"
+        ],
+        "imageOrigins": [
+          "https://s4.anilist.co",
+          "https://s3.anilist.co",
+          "https://cdn.myanimelist.net"
+        ],
+        "streamOrigins": ["https://babastream.top", "https://fbcdn.net"],
+        "methods": ["GET", "POST"],
+        "maxConcurrentRequests": 4,
+        "allowUserBaseUrl": true,
+        "allowSubdomains": true
+      },
+      "presentation": {
+        "directPlayback": false,
+        "artworkLayout": "portrait",
+        "imageHeaders": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9,ru;q=0.7"
+        }
+      }
+    }
+  ],
+  "resolvers": [
+    {
+      "id": "twodhive.streams",
+      "sourceId": "twodhive",
+      "schemes": ["twodhive"],
+      "origins": []
+    }
+  ],
+  "contributions": {
+    "hostFeatures": []
+  },
+  "files": {}
+}

@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "sourceApiVersion": 1,
+  "minRuntimeAbi": 1,
+  "id": "filmorax.source.hdrezka",
+  "name": "HDRezka",
+  "description": "HDRezka catalogue, filters, metadata and native providers",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "publisherKeyId": "filmorax.sources",
+  "entrypoint": "src/index.mjs",
+  "permissions": ["http", "html", "settings", "sourceSession"],
+  "sources": [
+    {
+      "id": "hdrezka",
+      "name": "HDRezka",
+      "description": "source.description.hdrezka",
+      "language": "russian",
+      "category": "movies",
+      "baseUrl": "https://hdrezka.inc",
+      "isNsfw": false,
+      "supportsTorrentSearch": true,
+      "capabilities": [
+        "catalog",
+        "search",
+        "filters",
+        "metadata",
+        "playbackGroups",
+        "recommendations",
+        "streams",
+        "headers",
+        "mirrors"
+      ],
+      "parameters": {},
+      "network": {
+        "origins": [
+          "https://hdrezka.inc",
+          "https://cinemar.cc",
+          "https://nextembed.ws",
+          "https://ortified.ws",
+          "https://femd.ws",
+          "https://delivembed.cc",
+          "https://embedstorage.net",
+          "https://buildplayer.com",
+          "https://multikland.net",
+          "https://stiven-king.com"
+        ],
+        "authOrigins": ["https://hdrezka.inc"],
+        "imageOrigins": ["https://hdrezka.inc"],
+        "streamOrigins": [
+          "https://cinemap.cc",
+          "https://cinemar.cc",
+          "https://nextembed.ws",
+          "https://ortified.ws",
+          "https://femd.ws",
+          "https://delivembed.cc",
+          "https://embedstorage.net",
+          "https://buildplayer.com",
+          "https://multikland.net",
+          "https://stiven-king.com"
+        ],
+        "methods": ["GET", "POST"],
+        "maxConcurrentRequests": 4,
+        "allowUserBaseUrl": true,
+        "userBaseUrlUses": ["httpAndAuth", "image"],
+        "allowSubdomains": true
+      },
+      "presentation": {
+        "icon": "assets/icon.png",
+        "directPlayback": false,
+        "artworkLayout": "portrait",
+        "imageHeaders": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9,ru;q=0.7"
+        }
+      }
+    }
+  ],
+  "resolvers": [
+    {
+      "id": "hdrezka.streams",
+      "sourceId": "hdrezka",
+      "schemes": ["hdrezka", "collaps"],
+      "origins": []
+    }
+  ],
+  "contributions": {
+    "hostFeatures": []
+  },
+  "files": {}
+}

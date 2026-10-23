@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "sourceApiVersion": 1,
+  "minRuntimeAbi": 1,
+  "id": "filmorax.source.tmdb",
+  "name": "TMDB",
+  "description": "TMDB metadata catalogue; no embedded video backend",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "publisherKeyId": "filmorax.sources",
+  "entrypoint": "src/index.mjs",
+  "permissions": ["http", "settings", "sourceSession"],
+  "sources": [
+    {
+      "id": "tmdb",
+      "name": "TMDB",
+      "description": "source.description.tmdb",
+      "language": "international",
+      "category": "movies",
+      "baseUrl": "https://api.themoviedb.org",
+      "isNsfw": false,
+      "supportsTorrentSearch": true,
+      "capabilities": [
+        "catalog",
+        "search",
+        "filters",
+        "metadata",
+        "recommendations",
+        "metadataOnly",
+        "accessToken",
+        "headers",
+        "mirrors"
+      ],
+      "parameters": {
+        "apiOrigin": "https://api.themoviedb.org",
+        "imageOrigin": "https://image.tmdb.org",
+        "imageRelay": "https://wsrv.nl",
+        "defaultApiKey": "4ef0d7355d9ffb5151e987764708ce96",
+        "language": "ru-RU",
+        "region": "RU"
+      },
+      "network": {
+        "origins": ["https://api.themoviedb.org"],
+        "webOrigins": ["https://www.themoviedb.org"],
+        "imageOrigins": ["https://image.tmdb.org", "https://wsrv.nl"],
+        "streamOrigins": [],
+        "authOrigins": ["https://api.themoviedb.org"],
+        "methods": ["GET"],
+        "maxConcurrentRequests": 4,
+        "allowUserBaseUrl": true,
+        "userBaseUrlUses": ["httpAndAuth"],
+        "injectAccessToken": false,
+        "settingsOrigins": {
+          "tmdb.api_mirror_url": "httpAndAuth",
+          "tmdb.image_mirror_url": "image"
+        }
+      },
+      "presentation": {
+        "directPlayback": false,
+        "artworkLayout": "portrait",
+        "imageHeaders": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9,ru;q=0.7"
+        }
+      },
+      "networkSettings": [
+        {
+          "id": "tmdb.api_mirror_mode",
+          "label": "source.mirrors.api",
+          "kind": "select",
+          "defaultValue": "official",
+          "defaultFromBaseUrl": "directMirror",
+          "options": [
+            {
+              "value": "official",
+              "label": "source.mirrors.official"
+            },
+            {
+              "value": "directMirror",
+              "label": "source.mirrors.direct",
+              "description": "source.mirrors.direct_subtitle"
+            },
+            {
+              "value": "lampaProxy",
+              "label": "source.mirrors.lampa_proxy",
+              "description": "source.mirrors.lampa_proxy_subtitle"
+            }
+          ]
+        },
+        {
+          "id": "tmdb.api_mirror_url",
+          "label": "source.mirrors.api_url",
+          "kind": "url",
+          "defaultValue": "",
+          "required": true,
+          "visibleWhen": {
+            "id": "tmdb.api_mirror_mode",
+            "values": ["directMirror", "lampaProxy"]
+          }
+        },
+        {
+          "id": "tmdb.image_mirror_mode",
+          "label": "source.mirrors.images",
+          "kind": "select",
+          "defaultValue": "publicImageRelay",
+          "options": [
+            {
+              "value": "publicImageRelay",
+              "label": "source.mirrors.public_relay",
+              "description": "source.mirrors.public_relay_subtitle"
+            },
+            {
+              "value": "official",
+              "label": "source.mirrors.official"
+            },
+            {
+              "value": "directMirror",
+              "label": "source.mirrors.direct",
+              "description": "source.mirrors.direct_subtitle"
+            },
+            {
+              "value": "lampaProxy",
+              "label": "source.mirrors.lampa_proxy",
+              "description": "source.mirrors.lampa_proxy_subtitle"
+            }
+          ]
+        },
+        {
+          "id": "tmdb.image_mirror_url",
+          "label": "source.mirrors.image_url",
+          "kind": "url",
+          "defaultValue": "",
+          "required": true,
+          "visibleWhen": {
+            "id": "tmdb.image_mirror_mode",
+            "values": ["directMirror", "lampaProxy"]
+          }
+        }
+      ]
+    }
+  ],
+  "resolvers": [],
+  "contributions": {
+    "hostFeatures": []
+  },
+  "files": {}
+}

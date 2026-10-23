@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "sourceApiVersion": 1,
+  "minRuntimeAbi": 1,
+  "id": "filmorax.source.yummyani",
+  "name": "YummyAni",
+  "description": "YummyAni catalogue, metadata, filters and native video providers",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "publisherKeyId": "filmorax.sources",
+  "entrypoint": "src/index.mjs",
+  "permissions": ["http", "html", "settings", "sourceSession"],
+  "sources": [
+    {
+      "id": "yummyani",
+      "name": "YummyAni",
+      "description": "source.description.yummyani",
+      "language": "russian",
+      "category": "anime",
+      "baseUrl": "https://ru.yummyani.me/api",
+      "isNsfw": false,
+      "supportsTorrentSearch": true,
+      "capabilities": [
+        "catalog",
+        "search",
+        "filters",
+        "metadata",
+        "playbackGroups",
+        "recommendations",
+        "streams",
+        "headers",
+        "auth"
+      ],
+      "parameters": {
+        "siteOrigin": "https://ru.yummyani.me"
+      },
+      "web": {
+        "loginUrl": "https://ru.yummyani.me",
+        "cookieOrigins": ["https://ru.yummyani.me"]
+      },
+      "network": {
+        "origins": [
+          "https://ru.yummyani.me",
+          "https://kodik.info",
+          "https://kodikplayer.com",
+          "https://aniqit.com",
+          "https://kodik.cc",
+          "https://kodik.video",
+          "https://plapi.cdnvideohub.com",
+          "https://nextembed.ws",
+          "https://ortified.ws",
+          "https://femd.ws",
+          "https://delivembed.cc",
+          "https://embedstorage.net",
+          "https://buildplayer.com",
+          "https://multikland.net",
+          "https://stiven-king.com"
+        ],
+        "imageOrigins": ["https://yummyani.me", "https://yani.tv"],
+        "streamOrigins": [
+          "https://kodik-storage.com",
+          "https://kodik.info",
+          "https://kodik.cc",
+          "https://aniqit.com",
+          "https://userapi.com",
+          "https://vkuser.net",
+          "https://mycdn.me",
+          "https://okcdn.ru",
+          "https://nextembed.ws",
+          "https://ortified.ws",
+          "https://femd.ws",
+          "https://delivembed.cc",
+          "https://embedstorage.net",
+          "https://buildplayer.com",
+          "https://multikland.net",
+          "https://stiven-king.com"
+        ],
+        "authOrigins": ["https://ru.yummyani.me"],
+        "methods": ["GET", "POST"],
+        "maxConcurrentRequests": 4,
+        "allowUserBaseUrl": true,
+        "allowSubdomains": true
+      },
+      "presentation": {
+        "icon": "assets/icon.png",
+        "directPlayback": false,
+        "artworkLayout": "portrait",
+        "imageHeaders": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9,ru;q=0.7"
+        }
+      }
+    }
+  ],
+  "resolvers": [
+    {
+      "id": "yummyani.streams",
+      "sourceId": "yummyani",
+      "schemes": ["https", "collaps"],
+      "origins": [
+        "https://kodik.info",
+        "https://kodikplayer.com",
+        "https://aniqit.com",
+        "https://kodik.cc",
+        "https://kodik.video",
+        "https://ru.yummyani.me",
+        "https://plapi.cdnvideohub.com",
+        "https://nextembed.ws",
+        "https://ortified.ws",
+        "https://femd.ws",
+        "https://delivembed.cc",
+        "https://embedstorage.net",
+        "https://buildplayer.com",
+        "https://multikland.net",
+        "https://stiven-king.com"
+      ]
+    }
+  ],
+  "contributions": {
+    "hostFeatures": []
+  },
+  "files": {}
+}

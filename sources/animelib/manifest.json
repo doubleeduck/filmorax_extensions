@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "sourceApiVersion": 1,
+  "minRuntimeAbi": 1,
+  "id": "filmorax.source.animelib",
+  "name": "AniLib",
+  "description": "AniLib catalogue, metadata and native episode providers",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "publisherKeyId": "filmorax.sources",
+  "entrypoint": "src/index.mjs",
+  "permissions": ["http", "html", "settings", "sourceSession"],
+  "sources": [
+    {
+      "id": "animelib",
+      "name": "AniLib",
+      "description": "source.description.animelib",
+      "language": "russian",
+      "category": "anime",
+      "baseUrl": "https://hapi.hentaicdn.org/api",
+      "isNsfw": false,
+      "supportsTorrentSearch": true,
+      "capabilities": [
+        "catalog",
+        "search",
+        "filters",
+        "metadata",
+        "playbackGroups",
+        "recommendations",
+        "streams",
+        "headers",
+        "auth",
+        "accessToken"
+      ],
+      "parameters": {
+        "siteOrigin": "https://animelib.org"
+      },
+      "web": {
+        "loginUrl": "https://animelib.org/ru/catalog",
+        "cookieOrigins": ["https://animelib.org", "https://hapi.hentaicdn.org"]
+      },
+      "network": {
+        "origins": [
+          "https://animelib.org",
+          "https://v3.animelib.org",
+          "https://hapi.hentaicdn.org",
+          "https://api.cdnlibs.org",
+          "https://kodik.info",
+          "https://kodikplayer.com",
+          "https://aniqit.com",
+          "https://kodik.cc",
+          "https://kodik.video",
+          "https://plapi.cdnvideohub.com"
+        ],
+        "imageOrigins": [
+          "https://animelib.org",
+          "https://cover.imglib.info",
+          "https://cover.imglib.org",
+          "https://img2.cdnlib.org",
+          "https://cdnlib.org",
+          "https://cdnlibs.org",
+          "https://hentaicdn.org"
+        ],
+        "streamOrigins": [
+          "https://video1.cdnlibs.org",
+          "https://cdnlibs.org",
+          "https://kodik-storage.com",
+          "https://kodik.info",
+          "https://kodik.cc",
+          "https://aniqit.com",
+          "https://userapi.com",
+          "https://vkuser.net",
+          "https://mycdn.me",
+          "https://okcdn.ru"
+        ],
+        "authOrigins": [
+          "https://hapi.hentaicdn.org",
+          "https://api.cdnlibs.org",
+          "https://animelib.org"
+        ],
+        "methods": ["GET", "POST"],
+        "maxConcurrentRequests": 4,
+        "allowUserBaseUrl": true,
+        "userBaseUrlUses": ["httpAndAuth"],
+        "allowSubdomains": true
+      },
+      "presentation": {
+        "icon": "assets/icon.png",
+        "directPlayback": false,
+        "artworkLayout": "portrait",
+        "imageHeaders": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0",
+          "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9,ru;q=0.7",
+          "Referer": "https://animelib.org/"
+        }
+      }
+    }
+  ],
+  "resolvers": [
+    {
+      "id": "animelib.streams",
+      "sourceId": "animelib",
+      "schemes": ["animelib", "https"],
+      "origins": [
+        "https://video1.cdnlibs.org",
+        "https://kodik.info",
+        "https://kodikplayer.com",
+        "https://aniqit.com",
+        "https://kodik.cc",
+        "https://kodik.video",
+        "https://plapi.cdnvideohub.com"
+      ]
+    }
+  ],
+  "contributions": {
+    "hostFeatures": []
+  },
+  "files": {}
+}

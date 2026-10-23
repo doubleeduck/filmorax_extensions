@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "sourceApiVersion": 1,
+  "minRuntimeAbi": 1,
+  "id": "filmorax.source.kinogo",
+  "name": "Kinogo",
+  "description": "Kinogo catalogue and native Collaps streams",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "publisherKeyId": "filmorax.sources",
+  "entrypoint": "src/index.mjs",
+  "permissions": ["http", "html", "settings", "sourceSession"],
+  "sources": [
+    {
+      "id": "kinogo",
+      "name": "Kinogo",
+      "description": "source.description.kinogo",
+      "language": "russian",
+      "category": "movies",
+      "baseUrl": "https://go3.kinogo.cc",
+      "isNsfw": false,
+      "supportsTorrentSearch": true,
+      "capabilities": [
+        "catalog",
+        "search",
+        "filters",
+        "metadata",
+        "playbackGroups",
+        "recommendations",
+        "streams",
+        "headers",
+        "auth",
+        "mirrors"
+      ],
+      "parameters": {},
+      "web": {
+        "loginUrl": "https://go3.kinogo.cc",
+        "cookieOrigins": ["https://go3.kinogo.cc"]
+      },
+      "network": {
+        "origins": [
+          "https://go3.kinogo.cc",
+          "https://nextembed.ws",
+          "https://ortified.ws",
+          "https://femd.ws",
+          "https://delivembed.cc",
+          "https://embedstorage.net",
+          "https://buildplayer.com",
+          "https://multikland.net",
+          "https://stiven-king.com"
+        ],
+        "imageOrigins": ["https://go3.kinogo.cc", "https://kinogo.cc"],
+        "streamOrigins": [
+          "https://nextembed.ws",
+          "https://ortified.ws",
+          "https://femd.ws",
+          "https://delivembed.cc",
+          "https://embedstorage.net",
+          "https://buildplayer.com",
+          "https://multikland.net",
+          "https://stiven-king.com"
+        ],
+        "authOrigins": ["https://go3.kinogo.cc"],
+        "methods": ["GET", "POST"],
+        "maxConcurrentRequests": 4,
+        "allowUserBaseUrl": true,
+        "userBaseUrlUses": ["httpAndAuth", "image"],
+        "allowSubdomains": true
+      },
+      "presentation": {
+        "directPlayback": false,
+        "artworkLayout": "portrait",
+        "imageHeaders": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "Accept": "image/jpeg,image/png,image/*;q=0.8,*/*;q=0.5",
+          "Accept-Language": "en-US,en;q=0.9,ru;q=0.7",
+          "Referer": "{imageOrigin}/"
+        }
+      }
+    }
+  ],
+  "resolvers": [
+    {
+      "id": "kinogo.streams",
+      "sourceId": "kinogo",
+      "schemes": ["collaps", "https"],
+      "origins": [
+        "https://nextembed.ws",
+        "https://ortified.ws",
+        "https://femd.ws",
+        "https://delivembed.cc",
+        "https://embedstorage.net",
+        "https://buildplayer.com",
+        "https://multikland.net",
+        "https://stiven-king.com"
+      ]
+    }
+  ],
+  "contributions": {
+    "hostFeatures": []
+  },
+  "files": {}
+}
