@@ -58,6 +58,8 @@
         ],
         "imageOrigins": ["https://yummyani.me", "https://yani.tv"],
         "streamOrigins": [
+          "https://solodcdn.com",
+          "https://interkh.com",
           "https://kodik-storage.com",
           "https://kodik.info",
           "https://kodik.cc",

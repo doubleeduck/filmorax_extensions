@@ -311,7 +311,11 @@ export default function createSource(context) {
     if (isCdnVideoHub(url)) return cdn(url);
     const uri = new URL(url),
       canUse = await authorized(),
-      headers = { Referer: 'https://v3.animelib.org/' };
+      headers = {
+        Referer: 'https://v3.animelib.org/',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
+      };
     if (
       uri.protocol === 'https:' &&
       uri.hostname.endsWith('.cdnlibs.org') &&

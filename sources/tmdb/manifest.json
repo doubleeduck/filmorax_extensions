@@ -56,6 +56,7 @@
         }
       },
       "presentation": {
+        "accessTokenHint": "source.access_token.default_hint",
         "directPlayback": false,
         "artworkLayout": "portrait",
         "imageHeaders": {

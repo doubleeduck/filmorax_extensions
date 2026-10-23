@@ -48,6 +48,7 @@
         "authOrigins": ["https://hdrezka.inc"],
         "imageOrigins": ["https://hdrezka.inc"],
         "streamOrigins": [
+          "https://interkh.com",
           "https://cinemap.cc",
           "https://cinemar.cc",
           "https://nextembed.ws",

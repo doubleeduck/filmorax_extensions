@@ -41,6 +41,7 @@
       },
       "network": {
         "origins": [
+          "https://video1.cdnlibs.org",
           "https://animelib.org",
           "https://v3.animelib.org",
           "https://hapi.hentaicdn.org",
@@ -62,6 +63,7 @@
           "https://hentaicdn.org"
         ],
         "streamOrigins": [
+          "https://solodcdn.com",
           "https://video1.cdnlibs.org",
           "https://cdnlibs.org",
           "https://kodik-storage.com",
@@ -74,6 +76,7 @@
           "https://okcdn.ru"
         ],
         "authOrigins": [
+          "https://video1.cdnlibs.org",
           "https://hapi.hentaicdn.org",
           "https://api.cdnlibs.org",
           "https://animelib.org"
