@@ -8,6 +8,7 @@ import {
   base64Text,
   base64Bytes,
   base64EncodeText,
+  hlsVariants,
 } from '../../../sdk/video.mjs';
 import { literalProperty } from '../../../sdk/literal.mjs';
 import { createCollaps, isCollaps } from '../../../resolvers/collaps.mjs';
@@ -261,17 +262,37 @@ export function createPlayer(context) {
       }
       if (!mediaUrl || media.protocol !== 'https:' || !mediaMime(media.href))
         throw fail('Cinemar has no supported native media', 'stream_unavailable');
-      return {
-        variants: [
-          {
-            url: media.href,
-            quality: /(?:^|[/_.-])(\d{3,4})p?(?:[/_.-]|$)/.exec(media.pathname)?.[1] ?? 'auto',
-            mimeType: mediaMime(media.href),
-            headers,
-            isPreferred: true,
-          },
-        ],
-      };
+      let variants = [
+        {
+          url: media.href,
+          quality: /(?:^|[/_.-])(\d{3,4})p?(?:[/_.-]|$)/.exec(media.pathname)?.[1] ?? 'auto',
+          mimeType: mediaMime(media.href),
+          headers,
+          isPreferred: true,
+        },
+      ];
+      if (mediaMime(media.href) === 'application/vnd.apple.mpegurl') {
+        try {
+          const playlist = text(
+            (
+              await context.http.request({
+                method: 'GET',
+                url: media.href,
+                responseType: 'text',
+                userAgentProfile: 'browser',
+                headers,
+                timeoutMs: 4000,
+              })
+            ).body,
+          );
+          const renditions = hlsVariants(playlist, media.href, headers);
+          if (renditions.length > 1) variants = renditions;
+        } catch (error) {
+          if (error?.code === 'cancelled') throw error;
+          // Quality discovery is optional; retain the original native stream.
+        }
+      }
+      return { variants };
     }
     if (uri.hostname !== 'stream') throw fail('Unsupported HDRezka URL');
     const base = first(

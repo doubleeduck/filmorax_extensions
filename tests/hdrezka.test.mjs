@@ -82,10 +82,46 @@ test('current Cinemar data envelopes select exact media and load via its officia
   assert.equal(groups[0].episodes.length, 2);
   const result = await player.resolve({ url: groups[0].episodes[1].url });
   assert.equal(result.variants[0].url, 'https://host.cinemap.cc/two/hls.m3u8');
-  assert.equal(calls.at(-1).body, JSON.stringify('opaque-two'));
-  assert.equal(calls.at(-1).headers.Referer, 'https://cinemar.cc/embed/42');
+  const apiCall = calls.find((call) => call.method === 'POST');
+  assert.equal(apiCall.body, JSON.stringify('opaque-two'));
+  assert.equal(apiCall.headers.Referer, 'https://cinemar.cc/embed/42');
   await assert.rejects(
     player.resolve({ url: lazy + '&media_id=missing' }),
     (e) => e.code === 'stream_unavailable',
   );
+});
+
+test('Cinemar discovers real HLS qualities and retains native fallback on discovery timeout', async () => {
+  const embed = 'https://cinemar.cc/embed/42';
+  const media = 'https://host.cinemap.cc/master.m3u8';
+  const html = JSON.stringify({
+    file: Buffer.from(JSON.stringify([{ id: 'movie', title: 'Dub', file: media }])).toString(
+      'base64',
+    ),
+  });
+  for (const outcome of ['success', 'timeout', 'cancelled']) {
+    const player = createPlayer({
+      http: {
+        request: async (input) => {
+          if (input.url === embed) return { body: html };
+          assert.equal(input.url, media);
+          assert.equal(input.headers.Referer, embed);
+          assert.equal(input.timeoutMs, 4000);
+          if (outcome !== 'success') throw Object.assign(Error(outcome), { code: outcome });
+          return {
+            body: '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=1280x720\n720/index.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=400000,RESOLUTION=854x480\n480/index.m3u8',
+          };
+        },
+      },
+    });
+    const result = player.resolve({ url: 'hdrezka://embed?url=' + encodeURIComponent(embed) });
+    if (outcome === 'cancelled') {
+      await assert.rejects(result, (error) => error.code === 'cancelled');
+    } else {
+      assert.deepEqual(
+        (await result).variants.map((v) => v.quality),
+        outcome === 'success' ? ['auto', '720', '480'] : ['auto'],
+      );
+    }
+  }
 });
