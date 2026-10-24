@@ -4,6 +4,7 @@
   "minRuntimeAbi": 1,
   "id": "filmorax.features.torrserver",
   "name": "TorrServer",
+  "icon": "assets/icon.png",
   "description": "Enables the app-owned TorrServer client, torrent search and settings.",
   "version": "1.0.0",
   "minAppVersion": "1.0.0",

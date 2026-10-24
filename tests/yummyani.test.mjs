@@ -66,3 +66,24 @@ test('YummyAni uses dynamic filters, correct API prefix and search/studio parame
   assert.equal(request.searchParams.get('genres'), 'drama');
   assert.equal(request.searchParams.get('sort_forward'), 'true');
 });
+
+test('YummyAni keeps current mixed-case CDNVideoHub iframe episodes', () => {
+  const result = item(
+    {
+      anime_url: 'fixture',
+      title: 'Fixture',
+      videos: [
+        {
+          video_id: 11,
+          number: 1,
+          data: { dubbing: 'Dub', player: 'CDNVideoHub', player_id: 7 },
+          iframe_url: '//ru.yummyani.me/iframeCVH.html?anime_id=42&episode=1&dubbing_code=Dub',
+        },
+      ],
+    },
+    'https://ru.yummyani.me',
+  );
+  assert.equal(result.playbackGroups.length, 1);
+  assert.equal(result.playbackGroups[0].episodes[0].id, '11');
+  assert.equal(result.playbackGroups[0].playerId, 'cdnVideoHub');
+});
