@@ -2,6 +2,25 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import createSource from '../sources/yummyani/src/index.mjs';
 import { item } from '../sources/yummyani/src/mapper.mjs';
+
+test('posters prefer the optimized native WebP size and keep legacy fallbacks', () => {
+  const base = { anime_url: 'film', title: 'Film' };
+  assert.equal(
+    item(
+      {
+        ...base,
+        poster: { big: '//imgproxy.yani.tv/poster.webp', fullsize: '//imgproxy.yani.tv/full.jpg' },
+      },
+      'https://ru.yummyani.me',
+    ).posterUrl,
+    'https://imgproxy.yani.tv/poster.webp',
+  );
+  assert.equal(
+    item({ ...base, poster: 'https://imgproxy.yani.tv/legacy.jpg' }, 'https://ru.yummyani.me')
+      .posterUrl,
+    'https://imgproxy.yani.tv/legacy.jpg',
+  );
+});
 test('YummyAni mapper preserves stable voice/provider groups and metadata filters', () => {
   const result = item(
     {

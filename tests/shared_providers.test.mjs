@@ -115,3 +115,37 @@ test('CDN playlist selection preserves episode/season/voice and one adaptive HLS
   assert.equal(result.variants.length, 2);
   assert.equal(result.variants[1].quality, 'auto');
 });
+
+test('CDN movie preserves exact voice without invented episode numbers', async () => {
+  const calls = [];
+  const resolve = createCdnVideoHub({
+    http: {
+      request: async ({ url }) => {
+        calls.push(url);
+        return {
+          body: url.includes('/playlist')
+            ? {
+                isSerial: false,
+                items: [
+                  { voiceStudio: 'Other', vkId: 'wrong' },
+                  { voiceStudio: 'AnilibriaTV', vkId: 'film' },
+                ],
+              }
+            : { sources: { mpegHighUrl: 'https://media.okcdn.ru/film.mp4' } },
+        };
+      },
+    },
+  });
+  const input =
+    'https://ru.yummyani.me/iframeCVH.html?anime_id=37987&episode=1&dubbing_code=AnilibriaTV';
+  assert.equal((await resolve(input)).variants.length, 1);
+  assert.ok(calls[1].endsWith('/video/film'));
+  await assert.rejects(
+    resolve(input.replace('episode=1', 'episode=2')),
+    (e) => e.code === 'episode_not_found',
+  );
+  await assert.rejects(
+    resolve(input.replace('AnilibriaTV', 'Missing')),
+    (e) => e.code === 'episode_not_found',
+  );
+});

@@ -151,7 +151,10 @@ export function item(value, base, details = false) {
     title = pick(data, ['title', 'name', 'rus_name', 'eng_name']),
     id = slug(pick(data, ['anime_url', 'url', 'slug', 'id', 'anime_id']), base);
   if (!title || !id) return null;
-  const poster = pick(object(data.poster), ['fullsize', 'large', 'big', 'medium', 'small', 'url']);
+  const poster =
+    typeof data.poster === 'string'
+      ? text(data.poster)
+      : pick(object(data.poster), ['big', 'large', 'medium', 'fullsize', 'small', 'url']);
   let posterUrl = '';
   try {
     if (poster) posterUrl = new URL(poster, base).href;

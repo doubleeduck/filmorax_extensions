@@ -64,15 +64,37 @@ export function cinemarMedia(html, embed) {
   if (typeof encoded !== 'string') return [];
   let best = [],
     score = 0;
+  // Current Cinemar #2 envelopes shuffle bounded base64 chunks. Read data,
+  // never evaluate the site's PlayerJS or its string-based dispatch function.
+  let current;
+  if (/^#2\d{2}/.test(encoded)) {
+    try {
+      const separator = String.fromCharCode(Number(encoded.slice(2, 4)));
+      const payload = encoded
+        .slice(4)
+        .split(separator)
+        .map((part) => {
+          if (part.length <= 32) return part;
+          const count = Number(part.at(-1));
+          if (!Number.isInteger(count) || count < 0 || count > 9 || part.length < 3 * count + 1)
+            throw fail('Invalid Cinemar envelope');
+          return part.slice(2 * count, part.length - count - 1) + part.slice(0, count);
+        })
+        .join('');
+      current = JSON.parse(base64Text(payload));
+    } catch {}
+  }
   for (let offset = 0; offset <= 24 && offset < encoded.length; offset++) {
     try {
-      const decoded = new TextDecoder().decode(
-          base64Bytes(encoded.slice(offset).replace(/[^A-Za-z0-9+/=]/g, '')),
-        ),
+      const decoded = current
+          ? ''
+          : new TextDecoder().decode(
+              base64Bytes(encoded.slice(offset).replace(/[^A-Za-z0-9+/=]/g, '')),
+            ),
         start = decoded.indexOf('[{'),
         end = decoded.lastIndexOf('}]');
-      if (start < 0 || end < start) continue;
-      const pending = [JSON.parse(decoded.slice(start, end + 2))],
+      if (!current && (start < 0 || end < start)) continue;
+      const pending = [current ?? JSON.parse(decoded.slice(start, end + 2))],
         rows = [];
       let count = 0;
       while (pending.length && count++ < 20000) {
@@ -82,32 +104,36 @@ export function cinemarMedia(html, embed) {
           continue;
         }
         if (!row || typeof row !== 'object') continue;
-        if (typeof row.file === 'string') rows.push(row);
+        if (typeof row.file === 'string' || typeof row.data === 'string') rows.push(row);
         if (Array.isArray(row.folder)) pending.push(...row.folder.slice().reverse());
       }
       if (rows.length > score) {
         score = rows.length;
         best = rows;
       }
+      if (current) break;
     } catch {}
   }
   return dedupe(
     best
       .map((row, index) => {
         try {
-          const uri = new URL(row.file, embed);
-          if (uri.protocol !== 'https:' || !mediaMime(uri.href)) return null;
+          const uri = new URL(text(row.file), embed);
+          const url = uri.protocol === 'https:' && mediaMime(uri.href) ? uri.href : '';
+          const data = text(row.data);
+          if (!url && (!data || data.length > 16384 || !text(row.id))) return null;
           const title = text(row.title2),
             full = /(\d+)\s*(?:сезон|season)\D+(\d+)\s*(?:сер|episode)/i.exec(title),
             episode = full?.[2] ?? /(\d+)\s*(?:сер|episode)/i.exec(title)?.[1] ?? String(index + 1),
             season = full?.[1] ?? '1';
           return {
-            id: first(row.id, uri.href),
+            id: first(row.id, url),
             title: title || `episodes.fallback ${episode}`,
             voice: first(row.title, 'Cinemar'),
             episode,
             season,
-            url: uri.href,
+            url,
+            ...(data ? { data } : {}),
             durationSeconds:
               Number.isInteger(Number(row.duration)) && row.duration != null
                 ? Number(row.duration)
@@ -208,14 +234,40 @@ export function createPlayer(context) {
         id = text(uri.searchParams.get('media_id')),
         row = id ? rows.find((v) => v.id === id) : rows[0];
       if (!row) throw fail('HDRezka embed has no supported native file', 'stream_unavailable');
+      const headers = { Referer: embed.href, Origin: embed.origin };
+      let mediaUrl = row.url;
+      if (row.data) {
+        const response = object(
+          (
+            await context.http.request({
+              method: 'POST',
+              url: new URL('/api/playlist/load', embed).href,
+              responseType: 'json',
+              userAgentProfile: 'browser',
+              headers: { ...headers, 'Content-Type': 'application/json' },
+              body: JSON.stringify(row.data),
+            })
+          ).body,
+        );
+        if (response.success === false)
+          throw fail('Cinemar rejected this media', 'stream_unavailable');
+        mediaUrl = text((response.data ?? response).file);
+      }
+      let media;
+      try {
+        media = new URL(mediaUrl, embed);
+      } catch {
+        throw fail('Invalid Cinemar media', 'stream_unavailable');
+      }
+      if (!mediaUrl || media.protocol !== 'https:' || !mediaMime(media.href))
+        throw fail('Cinemar has no supported native media', 'stream_unavailable');
       return {
         variants: [
           {
-            url: row.url,
-            quality:
-              /(?:^|[/_.-])(\d{3,4})p?(?:[/_.-]|$)/.exec(new URL(row.url).pathname)?.[1] ?? 'auto',
-            mimeType: mediaMime(row.url),
-            headers: { Referer: embed.href, Origin: embed.origin },
+            url: media.href,
+            quality: /(?:^|[/_.-])(\d{3,4})p?(?:[/_.-]|$)/.exec(media.pathname)?.[1] ?? 'auto',
+            mimeType: mediaMime(media.href),
+            headers,
             isPreferred: true,
           },
         ],

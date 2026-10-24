@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { catalogPath, menuRows, sortForm } from '../sources/hdrezka/src/filters.mjs';
-import { decodePlaylist, playlistVariants, cinemarMedia } from '../sources/hdrezka/src/player.mjs';
+import {
+  decodePlaylist,
+  playlistVariants,
+  cinemarMedia,
+  createPlayer,
+} from '../sources/hdrezka/src/player.mjs';
 test('HDRezka preserves real genre exceptions, legacy filters and POST sorting', () => {
   const menu = menuRows([{ url: '/serialy/serial-muzyka/', name: 'Music' }]);
   assert.equal(
@@ -50,5 +55,37 @@ test('HDRezka decodes obfuscation, preserves MP4/HLS variants and exact Cinemar 
       ['one', '1', '1'],
       ['two', '1', '2'],
     ],
+  );
+});
+
+test('current Cinemar data envelopes select exact media and load via its official API', async () => {
+  const entries = [
+    { id: 'one', title: 'Dub', title2: '1 серия', data: 'opaque-one', file: '#ba404' },
+    { id: 'two', title: 'Dub', title2: '2 серия', data: 'opaque-two', file: '#ba404' },
+  ];
+  const b64 = Buffer.from(JSON.stringify(entries)).toString('base64');
+  const shuffled = b64.slice(-2) + 'xx' + b64.slice(0, -2) + 'yy2';
+  const html = `Cinemar(${JSON.stringify({ file: '#237' + shuffled })})`;
+  const calls = [];
+  const player = createPlayer({
+    http: {
+      request: async (input) => {
+        calls.push(input);
+        return {
+          body: input.method === 'POST' ? { file: 'https://host.cinemap.cc/two/hls.m3u8' } : html,
+        };
+      },
+    },
+  });
+  const lazy = 'hdrezka://embed?url=' + encodeURIComponent('https://cinemar.cc/embed/42');
+  const groups = await player.groups({ url: lazy });
+  assert.equal(groups[0].episodes.length, 2);
+  const result = await player.resolve({ url: groups[0].episodes[1].url });
+  assert.equal(result.variants[0].url, 'https://host.cinemap.cc/two/hls.m3u8');
+  assert.equal(calls.at(-1).body, JSON.stringify('opaque-two'));
+  assert.equal(calls.at(-1).headers.Referer, 'https://cinemar.cc/embed/42');
+  await assert.rejects(
+    player.resolve({ url: lazy + '&media_id=missing' }),
+    (e) => e.code === 'stream_unavailable',
   );
 });

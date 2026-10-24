@@ -133,7 +133,8 @@ export default function createSource(context) {
             },
           },
           next: {
-            selector: '.navigation a, .nav_ext a',
+            selector:
+              '.navigation a, .nav_ext a, .bot-hikinogo_navigation a, .hikinogo_navigation a',
             all: true,
             fields: { url: { attr: 'href' }, name: { text: true } },
           },

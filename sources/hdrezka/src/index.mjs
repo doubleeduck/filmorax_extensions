@@ -131,7 +131,9 @@ export default function createSource(context) {
       path = term ? '/search/' : catalogPath(f, page, menu),
       { base, html } = await get(
         path,
-        term ? { params: { do: 'search', subaction: 'search', q: term } } : { body: sortForm(f) },
+        term
+          ? { params: { do: 'search', subaction: 'search', q: term, search_start: String(page) } }
+          : { body: sortForm(f) },
       ),
       data = object(
         await context.html.extract(html, {
@@ -142,7 +144,7 @@ export default function createSource(context) {
             },
             all: { selector: cardSelector, all: true, fields: cardFields },
             next: {
-              selector: '.navigation a, .pagination a',
+              selector: '.navigation a, .pagination a, .pagiNation a',
               all: true,
               fields: { label: { text: true }, url: { attr: 'href' } },
             },
