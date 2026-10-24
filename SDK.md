@@ -153,6 +153,15 @@ cookie-сессий привязано к signed auth origins. Ответы Set-
 expiry/LRU. Он не меняет пользовательскую capture-сессию и не отдаёт cookies JS.
 Статические несекретные flags можно объявить в `network.cookieDefaults`.
 
+Для входа через WebView объявите capability `auth`, разрешение `sourceSession`,
+`web.loginUrl`, `web.cookieOrigins` и точные `network.authOrigins` (внутри HTTP
+grants). `network.userAgentProfile` задаёт общий профиль браузера и HTTP:
+`app`, `browser` или `mobileSafari`. Для браузерной проверки обычно нужен
+`browser`; явный профиль отдельного `http.request` должен быть согласован
+с профилем, использованным для получения cookie. Произвольная строка UA в
+этом поле запрещена. Хост читает cookies через API браузера, включая HttpOnly,
+но только для объявленных источником HTTPS origins; расширению cookies не выдаются.
+
 Для native MP4/WebM/MKV на точном `authOrigins` хост подставляет source session
 через ограниченный loopback streaming broker. Native consumer получает только
 непредсказуемый локальный URL, без Authorization/Cookie. Range/HEAD поддержаны;

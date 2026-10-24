@@ -3,6 +3,21 @@ import assert from 'node:assert/strict';
 import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'node:crypto';
 import { createBabaStream } from '../sources/twodhive/src/babastream.mjs';
 import createSource from '../sources/twodhive/src/index.mjs';
+import { readFile } from 'node:fs/promises';
+
+test('browser login is declared with source-scoped session permissions', async () => {
+  const manifest = JSON.parse(
+    await readFile(new URL('../sources/twodhive/manifest.json', import.meta.url), 'utf8'),
+  );
+  const source = manifest.sources[0];
+  assert.ok(manifest.permissions.includes('sourceSession'));
+  assert.ok(source.capabilities.includes('auth'));
+  assert.equal(source.web.loginUrl, 'https://2dhive.com');
+  assert.deepEqual(source.web.cookieOrigins, ['https://2dhive.com']);
+  assert.deepEqual(source.network.authOrigins, ['https://2dhive.com']);
+  assert.equal(source.network.userAgentProfile, 'browser');
+  assert.equal(source.isNsfw, false);
+});
 const key = Buffer.alloc(32, 7),
   pk = key.toString('base64');
 function encrypt({ key: encoded, plaintext }) {

@@ -9,7 +9,7 @@
   "minAppVersion": "1.0.0",
   "publisherKeyId": "filmorax.sources",
   "entrypoint": "src/index.mjs",
-  "permissions": ["http", "html", "settings", "crypto"],
+  "permissions": ["http", "html", "settings", "crypto", "sourceSession"],
   "sources": [
     {
       "id": "twodhive",
@@ -28,8 +28,13 @@
         "playbackGroups",
         "recommendations",
         "streams",
-        "headers"
+        "headers",
+        "auth"
       ],
+      "web": {
+        "loginUrl": "https://2dhive.com",
+        "cookieOrigins": ["https://2dhive.com"]
+      },
       "parameters": {
         "playerOrigin": "https://babastream.top",
         "verificationOrigin": "https://hostinger.babastream.top"
@@ -38,6 +43,8 @@
         "resolveTimeoutMs": 60000
       },
       "network": {
+        "userAgentProfile": "browser",
+        "authOrigins": ["https://2dhive.com"],
         "origins": [
           "https://2dhive.com",
           "https://babastream.top",
