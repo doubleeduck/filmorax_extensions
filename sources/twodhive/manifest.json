@@ -53,6 +53,7 @@
         "imageOrigins": [
           "https://s4.anilist.co",
           "https://s3.anilist.co",
+          "https://cdn.anipixcdn.co",
           "https://cdn.myanimelist.net"
         ],
         "streamOrigins": [

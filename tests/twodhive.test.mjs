@@ -18,6 +18,21 @@ test('browser login is declared with source-scoped session permissions', async (
   assert.equal(source.network.userAgentProfile, 'browser');
   assert.equal(source.isNsfw, false);
 });
+
+test('latest catalog poster origins are granted separately from playback', async () => {
+  const {
+    sources: [source],
+  } = JSON.parse(
+    await readFile(new URL('../sources/twodhive/manifest.json', import.meta.url), 'utf8'),
+  );
+  for (const poster of [
+    'https://cdn.anipixcdn.co/poster/fixture.webp',
+    'https://s4.anilist.co/file/anilistcdn/media/anime/cover/fixture.jpg',
+  ])
+    assert.ok(source.network.imageOrigins.includes(new URL(poster).origin));
+  assert.ok(!source.network.origins.includes('https://cdn.anipixcdn.co'));
+  assert.ok(!source.network.authOrigins.includes('https://cdn.anipixcdn.co'));
+});
 const key = Buffer.alloc(32, 7),
   pk = key.toString('base64');
 function encrypt({ key: encoded, plaintext }) {
