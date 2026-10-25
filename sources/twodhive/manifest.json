@@ -55,7 +55,11 @@
           "https://s3.anilist.co",
           "https://cdn.myanimelist.net"
         ],
-        "streamOrigins": ["https://babastream.top", "https://fbcdn.net"],
+        "streamOrigins": [
+          "https://babastream.top",
+          "https://fbcdn.net",
+          "https://us-icbuim-file.oss-us-east-1.aliyuncs.com"
+        ],
         "methods": ["GET", "POST"],
         "maxConcurrentRequests": 4,
         "allowUserBaseUrl": true,

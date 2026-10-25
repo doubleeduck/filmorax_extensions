@@ -233,19 +233,22 @@ export default function createSource(context) {
     const data = {
       ...object((await get(`/anime/${encodeURIComponent(id)}`, { 'fields[]': detailFields })).data),
     };
-    data.episodes = [];
-    for (const lookup of new Set(
-      [data.slug_url, data.slug, id, data.id].map(text).filter(Boolean),
-    )) {
-      const episodes = array((await soft(() => get('/episodes', { anime_id: lookup }), {})).data);
-      if (episodes.length) {
-        data.episodes = episodes;
-        break;
+    async function episodes() {
+      for (const lookup of new Set(
+        [data.slug_url, data.slug, id, data.id].map(text).filter(Boolean),
+      )) {
+        const rows = array((await soft(() => get('/episodes', { anime_id: lookup }), {})).data);
+        if (rows.length) return rows;
       }
+      return [];
     }
-    data.relatedItems = extractItems(
-      await soft(() => get(`/anime/${encodeURIComponent(id)}/similar`, { 'site_id[]': ['5'] }), {}),
-    );
+    // Similar titles are independent of episode lookup/fallbacks.
+    const [rows, related] = await Promise.all([
+      episodes(),
+      soft(() => get(`/anime/${encodeURIComponent(id)}/similar`, { 'site_id[]': ['5'] }), {}),
+    ]);
+    data.episodes = rows;
+    data.relatedItems = extractItems(related);
     return item(data, await authorized());
   }
   async function loadEpisode(id) {

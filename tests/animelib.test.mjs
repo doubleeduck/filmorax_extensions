@@ -2,6 +2,41 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import createSource from '../sources/animelib/src/index.mjs';
 import { item, richText } from '../sources/animelib/src/mapper.mjs';
+
+test('AniLib fetches related titles while episode lookup is pending', async () => {
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  let relatedStarted = false,
+    episodeCalls = 0;
+  const source = createSource({
+    baseUrl: 'https://hapi.hentaicdn.org/api',
+    settings: { network: async () => ({}) },
+    auth: { getSession: async () => ({}) },
+    http: {
+      request: async ({ url }) => {
+        const path = new URL(url).pathname;
+        if (path.endsWith('/similar')) {
+          relatedStarted = true;
+          return { body: { data: [] } };
+        }
+        if (path.endsWith('/episodes')) {
+          episodeCalls++;
+          await gate;
+          return { body: { data: [{ id: 11, number: 1 }] } };
+        }
+        return { body: { data: { id: 42, slug_url: '42-fixture', rus_name: 'Fixture' } } };
+      },
+    },
+  });
+  const result = source.loadDetails({ itemId: 'animelib-42-fixture' });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(relatedStarted, true);
+  release();
+  assert.ok((await result).playbackGroups.length > 0);
+  assert.equal(episodeCalls, 1);
+});
 test('AniLib keeps rich text, metadata and stable lazy provider/episode IDs', () => {
   assert.equal(
     richText({

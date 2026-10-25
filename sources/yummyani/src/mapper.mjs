@@ -85,18 +85,37 @@ function metadata(data) {
   return dedupe(result, (row) => `${row.kind}:${row.value}`.toLowerCase());
 }
 function groups(data, base, slugId) {
-  const groups = new Map();
+  const groups = new Map(),
+    routes = new Map();
   for (const video of array(data.videos)) {
     const info = object(video.data),
       player = pick(info, ['player', 'source']),
       raw = pick(video, ['iframe_url', 'url']);
-    let url;
-    try {
-      url = new URL(raw, base).href;
-    } catch {
-      continue;
+    if (!raw || /[\\\x00-\x20\x7f]/.test(raw)) continue;
+    // Episodes share the iframe path and differ only by query parameters.
+    // URL polyfills are expensive in QuickJS: classify each path once, while
+    // preserving the episode/session query verbatim. Host DTO validates URLs.
+    const split = raw.search(/[?#]/),
+      path = split < 0 ? raw : raw.slice(0, split);
+    if (!routes.has(path)) {
+      let route = null;
+      try {
+        const uri = new URL(path, base);
+        const provider = isKodik(uri)
+          ? 'kodik'
+          : isCdnVideoHub(uri)
+            ? 'cdnVideoHub'
+            : isCollaps(uri)
+              ? 'collaps'
+              : null;
+        if (provider && !uri.username && !uri.password) route = { prefix: uri.href, provider };
+      } catch {}
+      routes.set(path, route);
     }
-    if (!raw || ![isKodik, isCdnVideoHub, isCollaps].some((test) => test(url))) continue;
+    const route = routes.get(path);
+    if (!route) continue;
+    const { provider } = route,
+      url = route.prefix + (split < 0 ? '' : raw.slice(split));
     const dubbing = first(pick(info, ['dubbing', 'voice', 'translation']), 'player.voice'),
       playerId = first(info.player_id, player, dubbing),
       key = join([dubbing, playerId]);
@@ -106,8 +125,8 @@ function groups(data, base, slugId) {
         title: dubbing,
         subtitle: player,
         episodes: [],
-        playerId: isKodik(url) ? 'kodik' : isCollaps(url) ? 'collaps' : 'cdnVideoHub',
-        playerLabel: isKodik(url) ? 'Kodik' : isCollaps(url) ? 'Collaps' : 'OKCDN',
+        playerId: provider,
+        playerLabel: { kodik: 'Kodik', collaps: 'Collaps', cdnVideoHub: 'OKCDN' }[provider],
       });
     const number = first(video.number, video.index),
       duration = Number(video.duration),

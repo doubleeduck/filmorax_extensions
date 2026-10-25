@@ -3,6 +3,82 @@ import assert from 'node:assert/strict';
 import createSource from '../sources/yummyani/src/index.mjs';
 import { item } from '../sources/yummyani/src/mapper.mjs';
 
+test('large series classifies each iframe route once and preserves every video', () => {
+  const NativeURL = globalThis.URL;
+  let parses = 0;
+  globalThis.URL = class extends NativeURL {
+    constructor(...args) {
+      super(...args);
+      parses++;
+    }
+  };
+  try {
+    const videos = Array.from({ length: 1880 }, (_, index) => ({
+      video_id: index + 1,
+      number: String((index % 148) + 1),
+      iframe_url:
+        index % 2
+          ? '//ru.yummyani.me/iframeCVH.html?anime_id=136&episode=' + ((index % 148) + 1)
+          : '//kodikplayer.com/season/51779/818a73d599fe3408dda49f49385fc2fe/720p?episode=' +
+            ((index % 148) + 1),
+      data: { player_id: index % 2, dubbing: 'Voice ' + Math.floor(index / 148) },
+    }));
+    const result = item(
+      { anime_url: 'fixture', title: 'Fixture', videos },
+      'https://ru.yummyani.me',
+    );
+    assert.equal(result.playbackGroups.flatMap((group) => group.episodes).length, videos.length);
+    assert.ok(parses <= 6, `Repeated URL parsing: ${parses}`);
+  } finally {
+    globalThis.URL = NativeURL;
+  }
+});
+
+test('route reuse preserves each episode query and rejects URL credentials', () => {
+  const urls = [
+    'https://kodikplayer.com/season/1/hash/720p?episode=1&token=a%2Fb#one',
+    'https://kodikplayer.com/season/1/hash/720p?episode=2&token=second#two',
+    'https://user:secret@kodikplayer.com/season/1/hash/720p?episode=3',
+    'https://kodikplayer.com/season/1/hash/720p?episode=4\\bad',
+  ];
+  const result = item(
+    {
+      anime_url: 'fixture',
+      title: 'Fixture',
+      videos: urls.map((url, i) => ({
+        video_id: i + 1,
+        number: i + 1,
+        iframe_url: url,
+        data: { dubbing: 'Voice' },
+      })),
+    },
+    'https://ru.yummyani.me',
+  );
+  assert.deepEqual(
+    result.playbackGroups.flatMap((g) => g.episodes).map((e) => e.url),
+    urls.slice(0, 2),
+  );
+});
+
+test('video API errors propagate instead of marking a playable title unavailable', async () => {
+  const failure = new Error('temporary network failure');
+  const source = createSource({
+    baseUrl: 'https://ru.yummyani.me/api',
+    parameters: { siteOrigin: 'https://ru.yummyani.me' },
+    settings: { network: async () => ({}) },
+    http: {
+      request: async ({ url }) => {
+        if (url.endsWith('/videos')) throw failure;
+        return { body: { response: { anime_url: 'fixture', anime_id: 42, title: 'Fixture' } } };
+      },
+    },
+  });
+  await assert.rejects(
+    source.loadDetails({ itemId: 'yummyani-fixture' }),
+    (error) => error === failure,
+  );
+});
+
 test('posters prefer the optimized native WebP size and keep legacy fallbacks', () => {
   const base = { anime_url: 'film', title: 'Film' };
   assert.equal(

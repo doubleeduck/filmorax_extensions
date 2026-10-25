@@ -203,15 +203,7 @@ export default function createSource(context) {
     const animeId = text(data.anime_id);
     if (animeId) {
       const [videos, related] = await Promise.all([
-        soft(
-          () =>
-            get(
-              `/anime/${encodeURIComponent(animeId)}/videos`,
-              {},
-              `${base}/catalog/item/${value}`,
-            ),
-          {},
-        ),
+        get(`/anime/${encodeURIComponent(animeId)}/videos`, {}, `${base}/catalog/item/${value}`),
         soft(
           () =>
             get(

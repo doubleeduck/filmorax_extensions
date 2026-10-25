@@ -3,7 +3,7 @@ const browserAgent =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 export function isKodik(value) {
   try {
-    const url = new URL(value);
+    const url = value instanceof URL ? value : new URL(value);
     return (
       url.protocol === 'https:' &&
       !/\.(?:m3u8|mp4)$/i.test(url.pathname) &&

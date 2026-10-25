@@ -12,7 +12,7 @@ export const collapsHosts = [
 ];
 export function isCollaps(input) {
   try {
-    const uri = new URL(input);
+    const uri = input instanceof URL ? input : new URL(input);
     return (
       (uri.protocol === 'collaps:' && uri.hostname === 'embed') ||
       (uri.protocol === 'https:' &&

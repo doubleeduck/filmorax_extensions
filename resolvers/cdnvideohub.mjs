@@ -2,7 +2,7 @@ import { text, array, object, first, fail, dedupe, queryUrl } from '../sdk/video
 const api = 'https://plapi.cdnvideohub.com/api/v1/player/sv';
 export function isCdnVideoHub(value) {
   try {
-    const uri = new URL(value);
+    const uri = value instanceof URL ? value : new URL(value);
     return (
       uri.protocol === 'https:' &&
       (uri.hostname.includes('cdnvideohub') ||
