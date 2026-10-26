@@ -38,7 +38,8 @@
         "streamOrigins": ["https://og.bakayaro.live"],
         "methods": ["GET"],
         "maxConcurrentRequests": 4,
-        "allowUserBaseUrl": true
+        "allowUserBaseUrl": true,
+        "userBaseUrlUses": ["image"]
       },
       "presentation": {
         "icon": "assets/icon.png",

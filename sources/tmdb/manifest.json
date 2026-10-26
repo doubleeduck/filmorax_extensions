@@ -48,7 +48,7 @@
         "methods": ["GET"],
         "maxConcurrentRequests": 4,
         "allowUserBaseUrl": true,
-        "userBaseUrlUses": ["httpAndAuth"],
+        "userBaseUrlUses": ["httpAndAuth", "image"],
         "injectAccessToken": false,
         "settingsOrigins": {
           "tmdb.api_mirror_url": "httpAndAuth",

@@ -84,7 +84,7 @@
         "methods": ["GET", "POST"],
         "maxConcurrentRequests": 4,
         "allowUserBaseUrl": true,
-        "userBaseUrlUses": ["httpAndAuth"],
+        "userBaseUrlUses": ["httpAndAuth", "image"],
         "allowSubdomains": true
       },
       "presentation": {
@@ -104,7 +104,7 @@
     {
       "id": "animelib.streams",
       "sourceId": "animelib",
-      "schemes": ["animelib", "https"],
+      "schemes": ["animelib", "https", "http"],
       "origins": [
         "https://video1.cdnlibs.org",
         "https://kodik.info",

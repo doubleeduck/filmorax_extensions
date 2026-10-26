@@ -45,30 +45,27 @@ export default function createSource(context) {
   const origin = async () =>
     ((await context.settings.network()).baseUrl || context.baseUrl).replace(/\/+$/, '');
   async function get(url, params) {
-    const result = text(
-      (
-        await context.http.request({
-          method: params ? 'POST' : 'GET',
-          url,
-          responseType: 'text',
-          userAgentProfile: 'browser',
-          headers: {
-            Accept: 'text/html',
-            Referer: (await origin()) + '/',
-            ...(params ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
-          },
-          ...(params ? { body: new URLSearchParams(params).toString() } : {}),
-        })
-      ).body,
-    );
+    const response = await context.http.request({
+      method: params ? 'POST' : 'GET',
+      url,
+      responseType: 'text',
+      userAgentProfile: 'browser',
+      headers: {
+        Accept: 'text/html',
+        Referer: (await origin()) + '/',
+        ...(params ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
+      },
+      ...(params ? { body: new URLSearchParams(params).toString() } : {}),
+    });
+    const result = text(response.body);
     if (result.includes('cf-chl-') || result.includes('Just a moment...'))
       throw fail('Kinogo requires browser authorization', 'auth_required');
-    return result;
+    return { html: result, url: response.url || url };
   }
   async function getFilters({ refresh = false } = {}) {
     if (cachedFilters && !refresh) return cachedFilters;
     const base = await origin(),
-      html = await get(base + '/'),
+      { html } = await get(base + '/'),
       anchors = array(
         await context.html.extract(html, {
           selector: 'a[href]',
@@ -101,12 +98,14 @@ export default function createSource(context) {
     ]);
   }
   async function search({ page = 1, searchTerm = '', selectedFilters = {} } = {}) {
-    const base = await origin(),
+    const configuredBase = await origin(),
       path = catalogPath(selectedFilters.path?.[0]),
       term = text(searchTerm);
     page = Math.max(1, page);
-    const html = await get(
-      term ? base + '/' : `${base}${path || '/'}${page > 1 ? `page/${page}/` : ''}`,
+    const { html, url: base } = await get(
+      term
+        ? configuredBase + '/'
+        : `${configuredBase}${path || '/'}${page > 1 ? `page/${page}/` : ''}`,
       term
         ? {
             do: 'search',
@@ -183,9 +182,9 @@ export default function createSource(context) {
     if (!itemId.startsWith('kinogo-')) return null;
     const path = titlePath('/' + decodeURIComponent(itemId.slice(7)) + '.html');
     if (!path) return null;
-    const base = await origin(),
-      referer = `${base}/${path}.html`,
-      html = await get(referer),
+    const configuredBase = await origin(),
+      { html, url: referer } = await get(`${configuredBase}/${path}.html`),
+      base = referer,
       data = object(
         await context.html.extract(html, {
           fields: {

@@ -96,7 +96,13 @@ const cleanBase = (value) => text(value).replace(/\/+$/, '');
 const validMirror = (value) => {
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash;
+    return (
+      ['http:', 'https:'].includes(url.protocol) &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      !url.hash
+    );
   } catch {
     return false;
   }

@@ -6,7 +6,10 @@ export default function createSource(context) {
   const vidy = createVidy(context),
     vsembed = createVsembed(context);
   async function get(path, params = {}) {
-    const url = new URL(context.parameters.apiOrigin + path);
+    const config = await context.settings.network();
+    const site = config.baseUrl || context.baseUrl;
+    const api = text(config.options?.['flixbaba.api_url']) || context.parameters.apiOrigin;
+    const url = new URL(api.replace(/\/+$/, '') + path);
     for (const [key, value] of Object.entries({ api_key: context.parameters.apiKey, ...params }))
       if (value != null && value !== '') url.searchParams.set(key, String(value));
     return object(
@@ -19,8 +22,8 @@ export default function createSource(context) {
           headers: {
             Accept: 'application/json',
             'Accept-Language': 'en-US,en;q=0.9,ru;q=0.7',
-            Referer: context.baseUrl + '/',
-            Origin: new URL(context.baseUrl).origin,
+            Referer: site.replace(/\/+$/, '') + '/',
+            Origin: new URL(site).origin,
           },
         })
       ).body,

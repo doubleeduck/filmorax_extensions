@@ -83,32 +83,26 @@ export default function createSource(context) {
     const base = await origin(),
       url = new URL(base + path);
     for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
-    return {
-      base,
-      html: text(
-        (
-          await context.http.request({
-            method: body ? 'POST' : 'GET',
-            url: url.href,
-            responseType: 'text',
-            userAgentProfile: 'browser',
-            headers: {
-              Accept: 'text/html',
-              'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-              Origin: base,
-              Referer: referer || base + '/',
-              ...(body
-                ? {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'X-Requested-With': 'XMLHttpRequest',
-                  }
-                : {}),
-            },
-            ...(body ? { body: new URLSearchParams(body).toString() } : {}),
-          })
-        ).body,
-      ),
-    };
+    const response = await context.http.request({
+      method: body ? 'POST' : 'GET',
+      url: url.href,
+      responseType: 'text',
+      userAgentProfile: 'browser',
+      headers: {
+        Accept: 'text/html',
+        'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+        Origin: new URL(base).origin,
+        Referer: referer || base + '/',
+        ...(body
+          ? {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'X-Requested-With': 'XMLHttpRequest',
+            }
+          : {}),
+      },
+      ...(body ? { body: new URLSearchParams(body).toString() } : {}),
+    });
+    return { base: response.url || url.href, html: text(response.body) };
   }
   async function getFilters({ refresh = false } = {}) {
     if (filters && !refresh) return filters;
@@ -178,11 +172,11 @@ export default function createSource(context) {
       '/' + decodeURIComponent(itemId.startsWith('hdrezka-') ? itemId.slice(8) : itemId),
     );
     if (!path) return null;
-    const base = await origin(),
-      referer = `${base}/${path}.html`,
-      { html } = await get('/' + path + '.html', {
-        referer: `${base}/${section(path.split('/')[0])}/`,
+    const configuredBase = await origin(),
+      { html, base } = await get('/' + path + '.html', {
+        referer: `${configuredBase}/${section(path.split('/')[0])}/`,
       }),
+      referer = base,
       data = object(
         await context.html.extract(html, {
           fields: {

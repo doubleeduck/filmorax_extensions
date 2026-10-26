@@ -11,12 +11,17 @@ const fallbackTypes = [
   { value: 'special', label: 'source_filter.type.special' },
 ];
 export default function createSource(context) {
-  const base = context.parameters.siteOrigin,
-    studios = new Map(),
+  const site = async () => {
+    const config = await context.settings.network();
+    return config.baseUrl
+      ? config.baseUrl.replace(/\/api\/?$/, '').replace(/\/+$/, '')
+      : context.parameters.siteOrigin;
+  };
+  const studios = new Map(),
     kodik = createKodik(context),
     cdn = createCdnVideoHub(context),
     collaps = createCollaps(context);
-  async function get(path, params = {}, referer = `${base}/catalog`) {
+  async function get(path, params = {}, referer) {
     const config = await context.settings.network(),
       raw = (config.baseUrl || context.baseUrl).replace(/\/+$/, '');
     const api = raw.endsWith('/api') ? raw : raw + '/api';
@@ -31,7 +36,7 @@ export default function createSource(context) {
           'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
           Lang: 'ru',
           Vary: 'json',
-          Referer: referer,
+          Referer: referer || `${await site()}/catalog`,
         },
       })
     ).body;
@@ -134,6 +139,7 @@ export default function createSource(context) {
       studio = text(filters.studio?.[0]),
       director = text(filters.director?.[0]);
     page = Math.max(1, page);
+    const base = await site();
     let rows;
     if (!term && studio) {
       let studioId = /^\d+$/.test(studio) ? studio : studios.get(studio);
@@ -194,6 +200,7 @@ export default function createSource(context) {
     return { items, hasMore: !(!term && director) && items.length >= 24 };
   }
   async function loadDetails({ itemId }) {
+    const base = await site();
     const value = slug(itemId.startsWith('yummyani-') ? itemId.slice(9) : itemId);
     if (!value) return null;
     const response = object(

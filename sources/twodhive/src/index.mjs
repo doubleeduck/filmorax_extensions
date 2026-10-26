@@ -61,20 +61,24 @@ const optionFilter = (id, title, values, kind = 'singleSelect') => ({
 });
 export default function createSource(context) {
   let cachedFilters;
-  const origin = async () => (await context.settings.network()).baseUrl || context.baseUrl;
   const get = async (path, params = {}, responseType = 'text') => {
     const config = await context.settings.network();
-    return (
-      await context.http.request({
-        method: 'GET',
-        url: queryUrl(config.baseUrl || context.baseUrl, path, params),
-        responseType,
-        userAgentProfile: 'browser',
-        headers: { Accept: 'text/html,application/json', Referer: `${context.baseUrl}/` },
-      })
-    ).body;
+    const url = queryUrl(
+      (config.baseUrl || context.baseUrl).replace(/\/+$/, '') + '/',
+      path.replace(/^\//, ''),
+      params,
+    );
+    const response = await context.http.request({
+      method: 'GET',
+      url,
+      responseType,
+      userAgentProfile: 'browser',
+      headers: { Accept: 'text/html,application/json', Referer: new URL(url).origin + '/' },
+    });
+    return { body: response.body, url: response.url || url };
   };
-  const project = (body, query) => context.html.extract(text(body), query);
+  const project = (response, query) =>
+    context.html.extract(text(response.body), query, response.url);
   async function getFilters({ refresh = false } = {}) {
     if (!refresh && cachedFilters) return cachedFilters;
     const data = object(
@@ -180,16 +184,17 @@ export default function createSource(context) {
       for (const key of ['format', 'score', 'sort'])
         if (text(selectedFilters[key]?.[0])) params[key] = selectedFilters[key][0];
     }
+    const response = await get(browsingGenre ? '/genre' : '/', params);
     const data = object(
-      await project(await get(browsingGenre ? '/genre' : '/', params), {
+      await project(response, {
         fields: { cards: cardsQuery, links: { selector: 'a[href]', all: true, attr: 'href' } },
       }),
     );
     return {
-      items: cards(data.cards, context.baseUrl),
+      items: cards(data.cards, response.url),
       hasMore: array(data.links).some((href) => {
         try {
-          return Number(new URL(href, context.baseUrl).searchParams.get('page')) === page + 1;
+          return Number(new URL(href, response.url).searchParams.get('page')) === page + 1;
         } catch {
           return false;
         }
@@ -199,8 +204,9 @@ export default function createSource(context) {
   async function loadDetails({ itemId }) {
     const id = /^twodhive-([1-9]\d*)$/.exec(itemId)?.[1];
     if (!id) return null;
+    const response = await get('/anime', { anime: id });
     const data = object(
-      await project(await get('/anime', { anime: id }), {
+      await project(response, {
         fields: {
           schemas: { selector: 'script[type="application/ld+json"]', all: true, text: true },
           facts: {
@@ -230,14 +236,15 @@ export default function createSource(context) {
     );
     let count = Number(schema.numberOfEpisodes) || (schema['@type'] === 'Movie' ? 1 : 0);
     if (data.completed === 'false')
-      count = Number(object(await get('/api/anime/episodes', { id }, 'json')).episodes) || count;
+      count =
+        Number(object((await get('/api/anime/episodes', { id }, 'json')).body).episodes) || count;
     count = Math.min(10000, Math.max(0, Math.trunc(count)));
     const year = Number(/\d{4}/.exec(text(schema.datePublished))?.[0]) || null,
       genres = array(schema.genre).map(text).filter(Boolean);
     const metadata = (kind, value) => ({ kind, labelKey: `media.metadata.${kind}`, value });
     return {
       id: itemId,
-      webUrl: new URL('/anime?anime=' + encodeURIComponent(id), await origin()).href,
+      webUrl: new URL('/anime?anime=' + encodeURIComponent(id), response.url).href,
       title: text(schema.name),
       originalTitle: text(facts.Japanese),
       subtitle: [year && String(year), facts.Type].filter(Boolean).join(' · '),
@@ -248,8 +255,8 @@ export default function createSource(context) {
         Math.max(0, Number(/\d+(?:\.\d+)?/.exec(first(data.rating, facts.Score))?.[0]) || 0),
       ),
       year,
-      posterUrl: text(schema.image),
-      backdropUrl: text(schema.image),
+      posterUrl: absolute(text(schema.image), response.url),
+      backdropUrl: absolute(text(schema.image), response.url),
       isNsfw: false,
       tags: genres,
       metadata: [
@@ -276,7 +283,7 @@ export default function createSource(context) {
             })),
           }))
         : [],
-      relatedItems: cards(data.cards, context.baseUrl)
+      relatedItems: cards(data.cards, response.url)
         .filter((row) => row.id !== itemId)
         .slice(0, 24),
     };

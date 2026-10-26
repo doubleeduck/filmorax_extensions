@@ -217,17 +217,17 @@ function item(data, overview, episodes) {
 }
 
 export default function createSource(context) {
-  const base = context.baseUrl,
-    proxy = context.parameters.proxyOrigin;
-  const headers = { Referer: `${new URL(base).origin}/`, Accept: 'application/json' };
+  const proxy = context.parameters.proxyOrigin;
+  const origin = async () =>
+    ((await context.settings.network()).baseUrl || context.baseUrl).replace(/\/+$/, '');
   const get = async (path, params = {}) => {
-    const config = await context.settings.network();
+    const base = await origin();
     return (
       await context.http.request({
         method: 'GET',
-        url: queryUrl(config.baseUrl || base, path, params),
+        url: queryUrl(base + '/', path.replace(/^\//, ''), params),
         responseType: 'json',
-        headers,
+        headers: { Referer: new URL(base).origin + '/', Accept: 'application/json' },
         userAgentProfile: 'browser',
       })
     ).body;
@@ -320,7 +320,7 @@ export default function createSource(context) {
           lang,
           server: text(server.id),
         });
-        const streamHeaders = { Referer: headers.Referer };
+        const streamHeaders = { Referer: new URL(await origin()).origin + '/' };
         const variants = [];
         for (const row of dedupe(
           array(data?.sources),

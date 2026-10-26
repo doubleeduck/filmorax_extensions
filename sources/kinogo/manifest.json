@@ -85,7 +85,7 @@
     {
       "id": "kinogo.streams",
       "sourceId": "kinogo",
-      "schemes": ["collaps", "https"],
+      "schemes": ["collaps", "https", "http"],
       "origins": [
         "https://nextembed.ws",
         "https://ortified.ws",

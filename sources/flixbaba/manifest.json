@@ -61,7 +61,12 @@
         ],
         "methods": ["GET", "POST"],
         "maxConcurrentRequests": 4,
-        "allowSubdomains": true
+        "allowSubdomains": true,
+        "allowUserBaseUrl": true,
+        "settingsOrigins": {
+          "flixbaba.api_url": "http"
+        },
+        "userBaseUrlUses": ["image"]
       },
       "presentation": {
         "icon": "assets/icon.png",
@@ -72,14 +77,22 @@
           "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
           "Accept-Language": "en-US,en;q=0.9,ru;q=0.7"
         }
-      }
+      },
+      "networkSettings": [
+        {
+          "id": "flixbaba.api_url",
+          "kind": "url",
+          "label": "API URL",
+          "defaultValue": ""
+        }
+      ]
     }
   ],
   "resolvers": [
     {
       "id": "flixbaba.streams",
       "sourceId": "flixbaba",
-      "schemes": ["flixbaba", "https"],
+      "schemes": ["flixbaba", "https", "http"],
       "origins": ["https://vsembed.ru", "https://player.videasy.net"]
     }
   ],
