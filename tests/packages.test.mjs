@@ -16,7 +16,12 @@ test('feature example is reproducible, signed and contains no executable payload
   const manifest = verifyPackage(a.archive, Buffer.from(a.publicRecord.publicKey, 'base64'));
   assert.deepEqual(manifest.contributions.hostFeatures, ['torrents.torrserver']);
   assert.equal(manifest.entrypoint, undefined);
-  assert.deepEqual(Object.keys(manifest.files), ['LICENSE', 'assets/icon.png']);
+  assert.deepEqual(Object.keys(manifest.files), [
+    'LICENSE',
+    'assets/docs/extensions.en.md',
+    'assets/docs/extensions.ru.md',
+    'assets/icon.png',
+  ]);
   assert.equal(manifest.icon, 'assets/icon.png');
 });
 test('a different publisher cannot verify the package', async () => {
