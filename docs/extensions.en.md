@@ -440,7 +440,43 @@ explicitly; never turn arbitrary unknown filter IDs into request parameters.
   empty groups. `supportsTorrentSearch` enables release search when the
   corresponding application feature is installed and enabled.
 
-### 4.3. Request flow
+### 4.3. Cast and actor catalogues
+
+A title may return `cast`, displayed above related videos. It is optional for
+every source, including metadata-only catalogues:
+
+```javascript
+cast: [{
+  id: '42', name: 'Actor name', character: 'Character name',
+  imageUrl: 'https://images.example.org/people/42.jpg',
+  catalogFilters: {actor: ['42'], section: ['all']},
+}]
+```
+
+`id` and `name` are required, IDs must be unique within the title. `character`
+and `imageUrl` default to empty strings. Missing/failed portraits have a fallback.
+Images must satisfy the source's declared image origin policy; the host derives
+image headers from the signed presentation settings. Do not supply `imageHeaders`
+inside a cast member. Limit: 300 members, 512 characters per name, 2048 per ID or
+character. Actor portraits are loaded as the horizontal list becomes visible.
+
+`catalogFilters` is optional (maximum 16 keys, 32 nonempty string values per key).
+Omit it or use `{}` for an informational card with no click action. Otherwise a
+click opens **the same source** with these exact initial filter values. Implement
+and expose those filters through `getFilters`/`search`; filter names are chosen by
+the extension, not the application. Use several entries when the target needs
+both a person ID and a mixed media section. Never put API URLs or executable code
+in this map. Cast remains available when a title is saved and reopened.
+
+TMDB uses `credits` (and `aggregate_credits` for TV) for the title's cast. Actor
+navigation uses `/3/person/{id}/combined_credits`, reads only `cast`, deduplicates
+by media type plus title ID, and paginates locally. Movie and TV IDs may coincide,
+so deduplicating by the numeric ID alone loses titles. A bounded, short-lived
+completed-response cache avoids fetching the entire filmography on every page;
+separate requests must retain independent cancellation. Search, year, genre,
+section and sort are then applied within that actor's credits.
+
+### 4.4. Request flow
 
 ```mermaid
 sequenceDiagram
@@ -471,7 +507,7 @@ explicitly, including scheme and port, without paths or `*`:
 | `streamOrigins` | Video and subtitles |
 | `webOrigins` | Public title links; does not grant API access |
 | `authOrigins` | Exact session recipients; redirects do not expand them |
-| `browserMediaOrigins` | Explicit browser MP4 delivery to the native player (Windows) |
+| `browserMediaOrigins` | Explicit browser MP4 delivery to the native player (Windows, Android phones/TV) |
 
 Signed extensions may explicitly declare HTTP. Do not disable TLS validation.
 The application follows redirects, including a new public domain, within the
@@ -505,7 +541,8 @@ by exposing a token in a public URL.
 A source may opt into `browserMediaOrigins` when its CDN challenges native HTTP
 requests. Each origin must be exact HTTPS and explicitly present in `origins`,
 `streamOrigins` and `authOrigins`; the package requires `sourceSession`.
-On Windows, the host reads through WebView2 in chunks up to 1 MiB while preserving
+On Windows (WebView2) and Android phones/TV (system WebView), the host reads
+in chunks up to 1 MiB while preserving
 native Range/HEAD semantics. Video still plays in the native player.
 This grant is separate from `userAgentProfile: browser`, is never inferred from
 redirects and does not enable other sources. Extension JavaScript receives no

@@ -61,6 +61,7 @@ const filters = () => [
     'section',
     'source_filter.section',
     [
+      ['all', 'source_filter.section.all'],
       ['movie', 'source_filter.section.films'],
       ['tv', 'source_filter.section.series'],
     ],
@@ -91,6 +92,13 @@ const filters = () => [
       return [year, year];
     }),
   ),
+  {
+    id: 'actor',
+    title: 'source_filter.actor',
+    kind: 'text',
+    placeholder: 'source_filter.actor.placeholder',
+    isAvailableWithSearchTerm: true,
+  },
 ];
 const cleanBase = (value) => text(value).replace(/\/+$/, '');
 const validMirror = (value) => {
@@ -216,6 +224,28 @@ function mapItem(data, type, routes, details = false) {
           ...genres.map((row) => metadata('genre', row.name, 'genre', String(row.id))),
         ]
       : [],
+    cast: details
+      ? dedupe(
+          (array(data.aggregate_credits?.cast).length
+            ? data.aggregate_credits.cast
+            : array(data.credits?.cast)
+          )
+            .filter(
+              (person) => Number.isSafeInteger(person.id) && person.id > 0 && text(person.name),
+            )
+            .map((person) => ({
+              id: String(person.id),
+              name: text(person.name),
+              character: first(
+                person.character,
+                names(array(person.roles).map((role) => role.character)).join(', '),
+              ),
+              imageUrl: routes.image(person.profile_path, 185),
+              catalogFilters: { actor: [String(person.id)], section: ['all'] },
+            })),
+          (person) => person.id,
+        ).slice(0, 300)
+      : [],
     playbackGroups: [],
     relatedItems: details
       ? dedupe(
@@ -264,21 +294,27 @@ function catalogueRequest(filters, type) {
 }
 
 export default function createSource(context) {
+  // Keep only one completed filmography. Page/filter changes reuse the response;
+  // concurrent operations retain independent cancellation and HTTP requests.
+  let filmography;
   async function configuration() {
     return routing(await context.settings.network(), context.parameters);
   }
-  async function get(path, params, routes) {
+  async function credential() {
     const session = await context.auth.getSession({ includeAccessToken: true });
-    const credential = text(session.accessToken).replace(/^(?:Bearer\s+)+/i, '');
+    return text(session.accessToken).replace(/^(?:Bearer\s+)+/i, '');
+  }
+  async function get(path, params, routes, accessToken) {
+    accessToken ??= await credential();
     const headers = { Accept: 'application/json' };
     params = {
       language: context.parameters.language,
       region: context.parameters.region,
       ...params,
     };
-    if (!credential || /^[a-fA-F0-9]{32}$/.test(credential))
-      params.api_key = credential || context.parameters.defaultApiKey;
-    else headers.Authorization = `Bearer ${credential}`;
+    if (!accessToken || /^[a-fA-F0-9]{32}$/.test(accessToken))
+      params.api_key = accessToken || context.parameters.defaultApiKey;
+    else headers.Authorization = `Bearer ${accessToken}`;
     const url = new URL(routes.api(path));
     for (const [key, value] of Object.entries(params))
       if (value != null && value !== '') url.searchParams.set(key, String(value));
@@ -288,11 +324,110 @@ export default function createSource(context) {
         .body,
     );
   }
+  function order(rows, collection) {
+    const date = (row) => Date.parse(row.release_date ?? row.first_air_date ?? '') || 0;
+    return rows.sort(
+      (a, b) =>
+        (collection === 'newest'
+          ? date(b) - date(a)
+          : collection === 'top_rated'
+            ? (Number(b.vote_average) || 0) - (Number(a.vote_average) || 0)
+            : (Number(b.popularity) || 0) - (Number(a.popularity) || 0)) ||
+        `${a.media_type}-${a.id}`.localeCompare(`${b.media_type}-${b.id}`),
+    );
+  }
+  async function actorCatalogue(actor, filters, term, page, routes) {
+    if (!/^[1-9]\d{0,9}$/.test(actor)) return { items: [], hasMore: false };
+    const path = `/3/person/${actor}/combined_credits`,
+      accessToken = await credential();
+    const key = JSON.stringify([
+      routes.api(path),
+      context.parameters.language,
+      context.parameters.region,
+      accessToken,
+    ]);
+    let data;
+    if (filmography?.key === key && filmography.expires > Date.now()) data = filmography.data;
+    else {
+      data = await get(path, {}, routes, accessToken);
+      filmography = { key, data, expires: Date.now() + 120_000 };
+    }
+    const section = text(filters.section?.[0]),
+      year = text(filters.year?.[0]),
+      genre = text(filters.genre?.[0]);
+    const query = term.toLocaleLowerCase();
+    const rows = order(
+      dedupe(
+        array(data.cast).filter(
+          (row) =>
+            row &&
+            ['movie', 'tv'].includes(row.media_type) &&
+            row.adult !== true &&
+            (!['movie', 'tv'].includes(section) || row.media_type === section) &&
+            (!year || text(row.release_date ?? row.first_air_date).startsWith(`${year}-`)) &&
+            (!genre || array(row.genre_ids).some((id) => String(id) === genre)) &&
+            (!query ||
+              [row.title, row.name, row.original_title, row.original_name].some((name) =>
+                text(name).toLocaleLowerCase().includes(query),
+              )),
+        ),
+        (row) => `${row.media_type}-${row.id}`,
+      ),
+      text(filters.collection?.[0]),
+    );
+    const items = rows.map((row) => mapItem(row, row.media_type, routes)).filter(Boolean);
+    const start = (page - 1) * 20;
+    return { items: items.slice(start, start + 20), hasMore: start + 20 < items.length };
+  }
   async function search({ page = 1, searchTerm = '', selectedFilters = {} } = {}) {
-    const type = text(selectedFilters.section?.[0]).toLowerCase() === 'tv' ? 'tv' : 'movie';
-    const currentPage = Math.min(500, Math.max(1, page)),
+    const section = text(selectedFilters.section?.[0]).toLowerCase();
+    const type = section === 'tv' ? 'tv' : 'movie';
+    const currentPage = Math.min(500, Math.max(1, Math.trunc(Number(page)) || 1)),
       term = text(searchTerm),
       routes = await configuration();
+    const actor = text(selectedFilters.actor?.[0]);
+    if (actor) return actorCatalogue(actor, selectedFilters, term, currentPage, routes);
+    if (section === 'all') {
+      const data = term
+        ? [
+            await get(
+              '/3/search/multi',
+              { query: term, include_adult: false, page: currentPage },
+              routes,
+            ),
+          ]
+        : await Promise.all(
+            ['movie', 'tv'].map(async (kind) => {
+              const request = catalogueRequest(selectedFilters, kind);
+              const response = await get(
+                request.path,
+                { ...request.params, page: currentPage },
+                routes,
+              );
+              return {
+                ...response,
+                results: array(response.results).map((row) => ({ ...row, media_type: kind })),
+              };
+            }),
+          );
+      return {
+        items: dedupe(
+          order(
+            data
+              .flatMap((response) => array(response.results))
+              .filter(
+                (row) => row && ['movie', 'tv'].includes(row.media_type) && row.adult !== true,
+              ),
+            text(selectedFilters.collection?.[0]),
+          )
+            .map((row) => mapItem(row, row.media_type, routes))
+            .filter(Boolean),
+          (row) => row.id,
+        ),
+        hasMore:
+          currentPage < 500 && data.some((response) => Number(response.total_pages) > currentPage),
+      };
+    }
     const request = term
       ? { path: `/3/search/${type}`, params: { query: term, include_adult: false } }
       : catalogueRequest(selectedFilters, type);
@@ -314,7 +449,7 @@ export default function createSource(context) {
       await get(
         `/3/${match[1]}/${match[2]}`,
         {
-          append_to_response: 'credits,recommendations,similar,external_ids,videos',
+          append_to_response: `${match[1] === 'tv' ? 'aggregate_credits,' : ''}credits,recommendations,similar,external_ids,videos`,
           include_image_language: 'ru,en,null',
         },
         routes,
