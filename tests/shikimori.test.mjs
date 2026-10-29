@@ -72,6 +72,7 @@ test('non-NSFW Shikimori has an icon, catalogue and an explicitly permitted shar
     await readFile(new URL('../sources/shikimori/manifest.json', import.meta.url)),
   );
   assert.equal(manifest.sources[0].isNsfw, false);
+  assert.deepEqual(manifest.sources[0].parameters, {});
   assert.ok(manifest.sources[0].network.origins.includes('https://plapi.cdnvideohub.com'));
   assert.equal(manifest.sources[0].presentation.icon, 'assets/icon.png');
 });

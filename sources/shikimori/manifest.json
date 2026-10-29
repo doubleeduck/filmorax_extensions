@@ -54,7 +54,8 @@
         "icon": "assets/icon.png",
         "directPlayback": false,
         "artworkLayout": "portrait"
-      }
+      },
+      "parameters": {}
     }
   ],
   "resolvers": [
