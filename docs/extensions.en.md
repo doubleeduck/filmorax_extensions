@@ -136,7 +136,7 @@ and the signature.
 
 | Source field | Contract |
 | --- | --- |
-| `parameters` | Up to 32 string parameters, 2048 characters each; author configuration, not user secrets |
+| `parameters` | Optional (default `{}`); up to 32 string parameters, 2048 characters each; author configuration, not user secrets |
 | `runtime.resolveTimeoutMs` | Resolver deadline, 30000–60000 ms; default 30000 |
 | `presentation.icon` | Signed PNG inside `assets/`; the package icon is the separate top-level `icon` |
 | `presentation.directPlayback` | Direct single-video viewing; default `false` |
