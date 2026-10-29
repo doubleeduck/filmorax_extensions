@@ -240,6 +240,27 @@ export default function createSource(context) {
       }))
       .sort((a, b) => b.episodes.length - a.episodes.length);
   }
+  async function recommendations(id, site) {
+    const response = await get('/api/animes/' + id + '/similar', {}, site);
+    return dedupe(
+      array(response.body)
+        .map((row) => item(row, response.site))
+        .filter(Boolean),
+      (row) => row.id,
+    ).slice(0, 24);
+  }
+  async function getRecommendations({ itemId } = {}) {
+    const id = /^shikimori-([1-9]\d*)$/.exec(itemId)?.[1];
+    return id ? recommendations(id) : [];
+  }
+  async function loadPlaybackGroups({ itemId, url } = {}) {
+    const site = await base();
+    const id =
+      /^shikimori-([1-9]\d*)$/.exec(itemId)?.[1] ||
+      /^\/animes\/([1-9]\d*)(?:-|$)/.exec(new URL(text(url), site).pathname)?.[1];
+    if (!id) return [];
+    return playbackGroups({ webUrl: siteUrl(site, '/animes/' + id) }, site);
+  }
   async function loadDetails({ itemId }) {
     const id = /^shikimori-([1-9]\d*)$/.exec(itemId)?.[1];
     if (!id) return null;
@@ -247,9 +268,9 @@ export default function createSource(context) {
       entry = item(response.body, response.site);
     if (!entry) return null;
     const [similar, groups] = await Promise.all([
-      get(`/api/animes/${id}/similar`, {}, response.site).catch((error) => {
+      recommendations(id, response.site).catch((error) => {
         if (critical(error)) throw error;
-        return { body: [] };
+        return [];
       }),
       playbackGroups(entry, response.site).catch((error) => {
         if (critical(error)) throw error;
@@ -260,12 +281,7 @@ export default function createSource(context) {
     entry.overview = description
       ? text((await context.html.text([description]))[0])
       : text(response.body.description).replace(/\[\/?[^\]]+\]/g, '');
-    entry.relatedItems = dedupe(
-      array(similar.body)
-        .map((row) => item(row, response.site))
-        .filter(Boolean),
-      (row) => row.id,
-    ).slice(0, 24);
+    entry.relatedItems = similar;
     entry.playbackGroups = groups;
     return entry;
   }
@@ -290,6 +306,8 @@ export default function createSource(context) {
     getFilters,
     search,
     loadDetails,
+    loadPlaybackGroups,
+    getRecommendations,
     resolveStream,
     getPopular: ({ page = 1 } = {}) => search({ page, selectedFilters: { order: ['popularity'] } }),
     getLatest: ({ page = 1 } = {}) => search({ page, selectedFilters: { order: ['aired_on'] } }),

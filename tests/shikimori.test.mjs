@@ -126,3 +126,20 @@ test('Shikimori reuses CDNVideoHub native streams with mirror headers; unsupport
   assert.equal(result.variants[0].headers.Origin, 'https://mirror.example');
   await assert.rejects(source.resolveStream({ url: 'https://evil.example/video/101' }));
 });
+
+test('Shikimori implements standalone declared methods without fetching unrelated detail data', async () => {
+  const { source, calls } = fixture({ baseUrl: 'https://mirror.example' });
+  const related = await source.getRecommendations({ itemId: 'shikimori-52991' });
+  assert.equal(related[0].id, 'shikimori-33352');
+  assert.equal(calls.length, 1);
+  assert.equal(new URL(calls[0].url).pathname, '/api/animes/52991/similar');
+  calls.length = 0;
+  const groups = await source.loadPlaybackGroups({
+    url: 'https://mirror.example/animes/52991-frieren',
+  });
+  assert.equal(groups.length, 2);
+  assert.equal(calls.length, 2);
+  assert.equal(new URL(calls[0].url).pathname, '/animes/52991/watch');
+  assert.deepEqual(await source.getRecommendations({ itemId: 'invalid' }), []);
+  assert.deepEqual(await source.loadPlaybackGroups({ itemId: 'invalid' }), []);
+});
