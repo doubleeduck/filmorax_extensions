@@ -13,7 +13,7 @@ export function isCdnVideoHub(value) {
     return false;
   }
 }
-export function createCdnVideoHub(context) {
+export function createCdnVideoHub(context, playbackOrigin = '') {
   const get = async (url, headers = {}, type = 'json') =>
     (
       await context.http.request({
@@ -32,7 +32,7 @@ export function createCdnVideoHub(context) {
       : uri.hostname.includes('yummyani')
         ? 'https://ru.yummyani.me'
         : uri.hostname === 'plapi.cdnvideohub.com'
-          ? ''
+          ? playbackOrigin
           : uri.origin;
     const headers = {
       Accept: 'application/json, text/plain, */*',

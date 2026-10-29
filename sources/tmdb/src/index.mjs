@@ -84,6 +84,19 @@ const filters = () => [
     'source_filter.genre',
     genreOptions.map(([id, name]) => [id, `source_filter.genre.${name}`]),
   ),
+  {
+    ...select('sort', 'source_filter.sort', [
+      ['popular', 'source_filter.sort.popular'],
+      ['least_popular', 'source_filter.sort.least_popular'],
+      ['rating', 'source_filter.sort.rating'],
+      ['lowest_rated', 'source_filter.sort.lowest_rated'],
+      ['new', 'source_filter.sort.new'],
+      ['old', 'source_filter.sort.oldest'],
+      ['name_asc', 'source_filter.sort.name_latin'],
+      ['name_desc', 'source_filter.sort.name_desc'],
+    ]),
+    kind: 'sort',
+  },
   select(
     'year',
     'source_filter.year',
@@ -99,6 +112,13 @@ const filters = () => [
     placeholder: 'source_filter.actor.placeholder',
     isAvailableWithSearchTerm: true,
   },
+  ...['director', 'studio'].map((id) => ({
+    id,
+    title: `source_filter.${id}`,
+    kind: 'text',
+    placeholder: `source_filter.${id}.placeholder`,
+    isAvailableWithSearchTerm: id === 'director',
+  })),
 ];
 const cleanBase = (value) => text(value).replace(/\/+$/, '');
 const validMirror = (value) => {
@@ -214,12 +234,32 @@ function mapItem(data, type, routes, details = false) {
           )
             .slice(0, 3)
             .map((name) => metadata('country', name)),
-          ...names(data.production_companies)
+          ...array(data.production_companies)
+            .filter((company) => company && text(company.name))
             .slice(0, 3)
-            .map((name) => metadata('studio', name)),
-          ...names(array(data.credits?.crew).filter((person) => person.job === 'Director'))
+            .map((company) =>
+              metadata(
+                'studio',
+                text(company.name),
+                company.id > 0 ? 'studio' : '',
+                String(company.id),
+              ),
+            ),
+          ...dedupe(
+            array(data.credits?.crew).filter(
+              (person) => person.job === 'Director' && text(person.name),
+            ),
+            (person) => person.id,
+          )
             .slice(0, 3)
-            .map((name) => metadata('director', name)),
+            .map((person) =>
+              metadata(
+                'director',
+                text(person.name),
+                person.id > 0 ? 'director' : '',
+                String(person.id),
+              ),
+            ),
           ...(runtime ? [metadata(tv ? 'episodes' : 'type', runtime)] : []),
           ...genres.map((row) => metadata('genre', row.name, 'genre', String(row.id))),
         ]
@@ -260,24 +300,40 @@ function mapItem(data, type, routes, details = false) {
 function catalogueRequest(filters, type) {
   const genre = text(filters.genre?.[0]),
     year = text(filters.year?.[0]),
+    studio = text(filters.studio?.[0]),
+    sort = text(filters.sort?.[0]),
     collection = text(filters.collection?.[0]).toLowerCase();
-  if (genre || year)
+  const sortBy = {
+    popular: 'popularity.desc',
+    least_popular: 'popularity.asc',
+    rating: 'vote_average.desc',
+    lowest_rated: 'vote_average.asc',
+    new: type === 'tv' ? 'first_air_date.desc' : 'primary_release_date.desc',
+    old: type === 'tv' ? 'first_air_date.asc' : 'primary_release_date.asc',
+    name_asc: type === 'tv' ? 'original_name.asc' : 'original_title.asc',
+    name_desc: type === 'tv' ? 'original_name.desc' : 'original_title.desc',
+  }[sort];
+  if (genre || year || studio || sortBy)
     return {
       path: `/3/discover/${type}`,
       params: {
         include_adult: false,
         include_video: false,
         sort_by:
-          collection === 'top_rated'
+          sortBy ??
+          (collection === 'top_rated'
             ? 'vote_average.desc'
             : collection === 'newest'
               ? type === 'tv'
                 ? 'first_air_date.desc'
                 : 'primary_release_date.desc'
-              : 'popularity.desc',
+              : 'popularity.desc'),
         with_genres: genre,
+        with_companies: studio,
         [type === 'tv' ? 'first_air_date_year' : 'primary_release_year']: year,
-        ...(collection === 'top_rated' ? { 'vote_count.gte': 100 } : {}),
+        ...(collection === 'top_rated' || ['rating', 'lowest_rated'].includes(sort)
+          ? { 'vote_count.gte': 100 }
+          : {}),
       },
     };
   return {
@@ -294,9 +350,9 @@ function catalogueRequest(filters, type) {
 }
 
 export default function createSource(context) {
-  // Keep only one completed filmography. Page/filter changes reuse the response;
-  // concurrent operations retain independent cancellation and HTTP requests.
-  let filmography;
+  // Completed responses only: concurrent calls retain independent cancellation.
+  const filmographies = new Map(),
+    companies = new Map();
   async function configuration() {
     return routing(await context.settings.network(), context.parameters);
   }
@@ -324,45 +380,72 @@ export default function createSource(context) {
         .body,
     );
   }
-  function order(rows, collection) {
+  function order(rows, collection, sort = '') {
     const date = (row) => Date.parse(row.release_date ?? row.first_air_date ?? '') || 0;
+    sort ||= collection === 'newest' ? 'new' : collection === 'top_rated' ? 'rating' : 'popular';
     return rows.sort(
       (a, b) =>
-        (collection === 'newest'
-          ? date(b) - date(a)
-          : collection === 'top_rated'
-            ? (Number(b.vote_average) || 0) - (Number(a.vote_average) || 0)
-            : (Number(b.popularity) || 0) - (Number(a.popularity) || 0)) ||
+        (sort === 'name_asc' || sort === 'name_desc'
+          ? text(a.original_title ?? a.original_name ?? a.title ?? a.name).localeCompare(
+              text(b.original_title ?? b.original_name ?? b.title ?? b.name),
+            ) * (sort === 'name_desc' ? -1 : 1)
+          : sort === 'old'
+            ? date(a) - date(b)
+            : sort === 'new'
+              ? date(b) - date(a)
+              : sort === 'lowest_rated'
+                ? (Number(a.vote_average) || 0) - (Number(b.vote_average) || 0)
+                : sort === 'rating'
+                  ? (Number(b.vote_average) || 0) - (Number(a.vote_average) || 0)
+                  : sort === 'least_popular'
+                    ? (Number(a.popularity) || 0) - (Number(b.popularity) || 0)
+                    : (Number(b.popularity) || 0) - (Number(a.popularity) || 0)) ||
         `${a.media_type}-${a.id}`.localeCompare(`${b.media_type}-${b.id}`),
     );
   }
-  async function actorCatalogue(actor, filters, term, page, routes) {
-    if (!/^[1-9]\d{0,9}$/.test(actor)) return { items: [], hasMore: false };
-    const path = `/3/person/${actor}/combined_credits`,
-      accessToken = await credential();
+  async function cachedCredits(person, routes, accessToken) {
+    const path = `/3/person/${person}/combined_credits`;
     const key = JSON.stringify([
       routes.api(path),
       context.parameters.language,
       context.parameters.region,
       accessToken,
     ]);
-    let data;
-    if (filmography?.key === key && filmography.expires > Date.now()) data = filmography.data;
-    else {
-      data = await get(path, {}, routes, accessToken);
-      filmography = { key, data, expires: Date.now() + 120_000 };
-    }
+    const cached = filmographies.get(key);
+    if (cached?.expires > Date.now()) return cached.data;
+    const data = await get(path, {}, routes, accessToken);
+    if (filmographies.size >= 8) filmographies.delete(filmographies.keys().next().value);
+    filmographies.set(key, { data, expires: Date.now() + 120_000 });
+    return data;
+  }
+  async function personCatalogue(actor, director, filters, term, page, routes) {
+    const valid = (id) => !id || /^[1-9]\d{0,9}$/.test(id);
+    const studio = text(filters.studio?.[0]);
+    if (![actor, director, studio].every(valid)) return { items: [], hasMore: false };
+    const accessToken = await credential();
+    const [acting, directing] = await Promise.all([
+      actor ? cachedCredits(actor, routes, accessToken) : null,
+      director && director !== actor ? cachedCredits(director, routes, accessToken) : null,
+    ]);
+    const directed = director
+      ? array((directing ?? acting)?.crew).filter((row) => row.job === 'Director')
+      : null;
+    const actingIds =
+      actor && director
+        ? new Set(array(acting.cast).map((row) => `${row.media_type}-${row.id}`))
+        : null;
     const section = text(filters.section?.[0]),
       year = text(filters.year?.[0]),
       genre = text(filters.genre?.[0]);
     const query = term.toLocaleLowerCase();
     const rows = order(
       dedupe(
-        array(data.cast).filter(
+        (directed ?? array(acting.cast)).filter(
           (row) =>
             row &&
             ['movie', 'tv'].includes(row.media_type) &&
             row.adult !== true &&
+            (!actingIds || actingIds.has(`${row.media_type}-${row.id}`)) &&
             (!['movie', 'tv'].includes(section) || row.media_type === section) &&
             (!year || text(row.release_date ?? row.first_air_date).startsWith(`${year}-`)) &&
             (!genre || array(row.genre_ids).some((id) => String(id) === genre)) &&
@@ -374,9 +457,36 @@ export default function createSource(context) {
         (row) => `${row.media_type}-${row.id}`,
       ),
       text(filters.collection?.[0]),
+      text(filters.sort?.[0]),
     );
-    const items = rows.map((row) => mapItem(row, row.media_type, routes)).filter(Boolean);
     const start = (page - 1) * 20;
+    let matches = rows;
+    if (studio) {
+      matches = [];
+      // Credits don't contain production companies. Inspect only enough titles
+      // to fill this page plus one, and retain small company-ID lists for reuse.
+      for (let at = 0; at < rows.length && matches.length <= start + 20; at += 4) {
+        const batch = await Promise.all(
+          rows.slice(at, at + 4).map(async (row) => {
+            const path = `/3/${row.media_type}/${row.id}`;
+            const key = JSON.stringify([routes.api(path), accessToken]);
+            let cached = companies.get(key);
+            if (!cached || cached.expires <= Date.now()) {
+              const data = await get(path, {}, routes, accessToken);
+              cached = {
+                ids: array(data.production_companies).map((company) => String(company.id)),
+                expires: Date.now() + 120_000,
+              };
+              if (companies.size >= 2048) companies.delete(companies.keys().next().value);
+              companies.set(key, cached);
+            }
+            return cached.ids.includes(studio) ? row : null;
+          }),
+        );
+        matches.push(...batch.filter(Boolean));
+      }
+    }
+    const items = matches.map((row) => mapItem(row, row.media_type, routes)).filter(Boolean);
     return { items: items.slice(start, start + 20), hasMore: start + 20 < items.length };
   }
   async function search({ page = 1, searchTerm = '', selectedFilters = {} } = {}) {
@@ -386,7 +496,11 @@ export default function createSource(context) {
       term = text(searchTerm),
       routes = await configuration();
     const actor = text(selectedFilters.actor?.[0]);
-    if (actor) return actorCatalogue(actor, selectedFilters, term, currentPage, routes);
+    const director = text(selectedFilters.director?.[0]),
+      studio = text(selectedFilters.studio?.[0]);
+    if (actor || director)
+      return personCatalogue(actor, director, selectedFilters, term, currentPage, routes);
+    if (studio && !/^[1-9]\d{0,9}$/.test(studio)) return { items: [], hasMore: false };
     if (section === 'all') {
       const data = term
         ? [
@@ -419,6 +533,7 @@ export default function createSource(context) {
                 (row) => row && ['movie', 'tv'].includes(row.media_type) && row.adult !== true,
               ),
             text(selectedFilters.collection?.[0]),
+            text(selectedFilters.sort?.[0]),
           )
             .map((row) => mapItem(row, row.media_type, routes))
             .filter(Boolean),

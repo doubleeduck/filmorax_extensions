@@ -60,7 +60,7 @@ test('FlixBaba preserves item/provider/episode IDs and every season for all four
   assert.equal(result.id, 'flixbaba-tv-603-fixture');
   assert.deepEqual(
     result.playbackGroups.map((g) => g.id),
-    ['flixbaba-vsembed', 'flixbaba-vidy', 'flixbaba-framextv', 'flixbaba-videasy'],
+    ['flixbaba-vidy', 'flixbaba-vsembed', 'flixbaba-framextv', 'flixbaba-videasy'],
   );
   for (const group of result.playbackGroups) {
     assert.equal(group.episodes.length, 5);

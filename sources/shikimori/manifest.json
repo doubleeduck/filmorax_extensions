@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "sourceApiVersion": 1,
+  "minRuntimeAbi": 1,
+  "id": "filmorax.source.shikimori",
+  "name": "Shikimori",
+  "description": "Shikimori anime catalogue and CDNVideoHub playback",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "publisherKeyId": "filmorax.sources",
+  "entrypoint": "src/index.mjs",
+  "permissions": ["http", "html", "settings"],
+  "sources": [
+    {
+      "id": "shikimori",
+      "name": "Shikimori",
+      "description": "source.description.shikimori",
+      "language": "russian",
+      "category": "anime",
+      "baseUrl": "https://shikimori.io",
+      "isNsfw": false,
+      "supportsTorrentSearch": true,
+      "capabilities": [
+        "catalog",
+        "search",
+        "filters",
+        "metadata",
+        "playbackGroups",
+        "recommendations",
+        "streams",
+        "headers"
+      ],
+      "network": {
+        "origins": ["https://shikimori.io", "https://plapi.cdnvideohub.com"],
+        "imageOrigins": [
+          "https://shikimori.io",
+          "https://shikimori.one",
+          "https://shikimori.me",
+          "https://desu.shikimori.one"
+        ],
+        "streamOrigins": [
+          "https://userapi.com",
+          "https://vkuser.net",
+          "https://mycdn.me",
+          "https://okcdn.ru"
+        ],
+        "methods": ["GET"],
+        "maxConcurrentRequests": 4,
+        "allowUserBaseUrl": true,
+        "allowSubdomains": true,
+        "userBaseUrlUses": ["image"]
+      },
+      "presentation": {
+        "icon": "assets/icon.png",
+        "directPlayback": false,
+        "artworkLayout": "portrait"
+      }
+    }
+  ],
+  "resolvers": [
+    {
+      "id": "shikimori.streams",
+      "sourceId": "shikimori",
+      "schemes": ["https"],
+      "origins": ["https://plapi.cdnvideohub.com"]
+    }
+  ],
+  "contributions": {
+    "hostFeatures": []
+  },
+  "files": {}
+}

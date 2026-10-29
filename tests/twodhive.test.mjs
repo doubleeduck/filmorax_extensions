@@ -35,6 +35,31 @@ test('latest catalog poster origins are granted separately from playback', async
 });
 const key = Buffer.alloc(32, 7),
   pk = key.toString('base64');
+
+test('default 2Dhive catalogue uses the full Top collection and follows its next page', async () => {
+  const calls = [];
+  const source = createSource({
+    baseUrl: 'https://2dhive.com',
+    settings: { network: async () => ({}) },
+    http: {
+      request: async (input) => {
+        calls.push(new URL(input.url));
+        return { body: 'fixture', url: input.url };
+      },
+    },
+    html: {
+      extract: async () => ({
+        cards: [{ link: '/anime?anime=42', title: 'Fixture' }],
+        links: ['/?list=top&page=3#anime-list'],
+      }),
+    },
+  });
+  const result = await source.search({ page: 2 });
+  assert.equal(calls[0].searchParams.get('list'), 'top');
+  assert.equal(result.hasMore, true);
+  await source.search({ selectedFilters: { list: ['latest'] } });
+  assert.equal(calls[1].searchParams.get('list'), 'latest');
+});
 function encrypt({ key: encoded, plaintext }) {
   const iv = randomBytes(12),
     cipher = createCipheriv('aes-256-gcm', Buffer.from(encoded, 'base64'), iv);

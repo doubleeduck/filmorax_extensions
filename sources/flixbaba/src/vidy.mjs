@@ -111,32 +111,37 @@ export function createVidy(context) {
             JSON.parse(decodeVidy(text(await request(url.href)), seed, Number(id))),
           ),
           variants = [];
-        for (const row of array(data.sources)) {
-          const target = text(row.url);
-          if (!/^https:\/\//.test(target)) continue;
-          const path = new URL(target).pathname,
-            quality = sourceQuality(row.quality),
-            mime = path.endsWith('.m3u8')
-              ? 'application/vnd.apple.mpegurl'
-              : path.endsWith('.mp4')
-                ? 'video/mp4'
-                : '';
-          if (!mime) continue;
-          if (mime.includes('mpegurl')) {
-            try {
-              const playlist = text(await request(target));
-              if (!playlist.trimStart().startsWith('#EXTM3U')) continue;
-              const renditions = hlsVariants(playlist, target, headers);
-              variants.push(
-                ...(renditions.length > 1
-                  ? renditions.filter((variant) => variant.url !== target)
-                  : renditions.map((variant) => ({ ...variant, quality }))),
-              );
-            } catch (error) {
-              if (critical(error)) throw error;
-            }
-          } else variants.push({ url: target, quality, mimeType: mime, headers });
-        }
+        const resolved = await Promise.all(
+          array(data.sources)
+            .slice(0, 16)
+            .map(async (row) => {
+              const target = text(row.url);
+              if (!/^https:\/\//.test(target)) return [];
+              const path = new URL(target).pathname,
+                quality = sourceQuality(row.quality),
+                mime = path.endsWith('.m3u8')
+                  ? 'application/vnd.apple.mpegurl'
+                  : path.endsWith('.mp4')
+                    ? 'video/mp4'
+                    : '';
+              if (!mime) return [];
+              if (mime.includes('mpegurl')) {
+                try {
+                  const playlist = text(await request(target));
+                  if (!playlist.trimStart().startsWith('#EXTM3U')) return [];
+                  const renditions = hlsVariants(playlist, target, headers);
+                  return renditions.length > 1
+                    ? renditions.filter((variant) => variant.url !== target)
+                    : renditions.map((variant) => ({ ...variant, quality }));
+                } catch (error) {
+                  if (critical(error)) throw error;
+                  return [];
+                }
+              }
+              return [{ url: target, quality, mimeType: mime, headers }];
+            }),
+        );
+        variants.push(...resolved.flat());
         if (!variants.length) continue;
         return {
           variants: dedupe(variants, (row) => `${row.url}:${row.quality}`),

@@ -68,8 +68,8 @@ const slug = (value) =>
     .replace(/^-+|-+$/g, '');
 export const idParts = (value) => /^(?:flixbaba-)?(movie|tv)-(\d+)/.exec(value);
 const providers = [
-  ['vsembed', 'VSEmbed'],
   ['vidy', 'Vidy'],
+  ['vsembed', 'VSEmbed'],
   ['framextv', 'FrameXTV'],
   ['videasy', 'Videasy'],
 ];

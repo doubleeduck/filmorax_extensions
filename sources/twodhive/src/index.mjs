@@ -135,11 +135,14 @@ export default function createSource(context) {
       } catch {}
     }
     cachedFilters = [
-      optionFilter('list', 'source_filter.collection', [
-        { value: 'latest', label: 'source_filter.sort.new' },
-        { value: 'top', label: 'source_filter.sort.top' },
-        { value: 'ongoing', label: 'source_filter.status.ongoing' },
-      ]),
+      {
+        ...optionFilter('list', 'source_filter.collection', [
+          { value: 'latest', label: 'source_filter.sort.new' },
+          { value: 'top', label: 'source_filter.sort.top' },
+          { value: 'ongoing', label: 'source_filter.status.ongoing' },
+        ]),
+        defaultValues: ['top'],
+      },
       ...(genres.size
         ? [
             {
@@ -180,14 +183,17 @@ export default function createSource(context) {
         ?.options.find((option) => option.value === genre)?.label;
       if (name) params.name = name;
     } else {
-      if (!term) params.list = first(selectedFilters.list?.[0], 'latest');
+      if (!term) params.list = first(selectedFilters.list?.[0], 'top');
       for (const key of ['format', 'score', 'sort'])
         if (text(selectedFilters[key]?.[0])) params[key] = selectedFilters[key][0];
     }
     const response = await get(browsingGenre ? '/genre' : '/', params);
     const data = object(
       await project(response, {
-        fields: { cards: cardsQuery, links: { selector: 'a[href]', all: true, attr: 'href' } },
+        fields: {
+          cards: cardsQuery,
+          links: { selector: 'a[href*="page="]', all: true, attr: 'href' },
+        },
       }),
     );
     return {

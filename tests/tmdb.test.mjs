@@ -32,9 +32,101 @@ const movie = {
   vote_average: 8.3,
   genre_ids: [16],
 };
+
+test('director catalogue includes only directing jobs, merges movie/TV and intersects acting credits', async () => {
+  const { source, calls } = fixture({
+    response: (input) =>
+      new URL(input.url).pathname.includes('/7/')
+        ? { cast: [{ ...movie, media_type: 'movie' }] }
+        : {
+            crew: [
+              { ...movie, media_type: 'movie', job: 'Director' },
+              { id: 8, name: 'Series', media_type: 'tv', job: 'Director' },
+              { ...movie, id: 9, media_type: 'movie', job: 'Producer' },
+            ],
+          },
+  });
+  const result = await source.search({ selectedFilters: { director: ['62'], section: ['all'] } });
+  assert.deepEqual(
+    result.items.map((row) => row.id),
+    ['tmdb-movie-42', 'tmdb-tv-8'],
+  );
+  const both = await source.search({
+    selectedFilters: { director: ['62'], actor: ['7'], section: ['all'] },
+  });
+  assert.deepEqual(
+    both.items.map((row) => row.id),
+    ['tmdb-movie-42'],
+  );
+  assert.equal(calls.length, 2);
+});
+test('studios use company IDs in both movie and TV discovery and remain paginated', async () => {
+  const { source, calls } = fixture({ response: { results: [movie], page: 2, total_pages: 4 } });
+  const result = await source.search({
+    page: 2,
+    selectedFilters: { studio: ['420'], section: ['all'] },
+  });
+  assert.equal(result.hasMore, true);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(
+    calls.map((call) => new URL(call.url).pathname),
+    ['/3/discover/movie', '/3/discover/tv'],
+  );
+  for (const call of calls) {
+    const uri = new URL(call.url);
+    assert.equal(uri.searchParams.get('with_companies'), '420');
+    assert.equal(uri.searchParams.get('page'), '2');
+  }
+});
+test('studio + director inspects only needed company metadata and reuses it across pages', async () => {
+  const rows = Array.from({ length: 28 }, (_, index) => ({
+    ...movie,
+    id: index + 1,
+    media_type: 'movie',
+    job: 'Director',
+  }));
+  const { source, calls } = fixture({
+    response: (input) =>
+      new URL(input.url).pathname.includes('/person/')
+        ? { crew: rows }
+        : { production_companies: [{ id: 420 }] },
+  });
+  const filters = { director: ['62'], studio: ['420'], section: ['all'] };
+  const first = await source.search({ selectedFilters: filters });
+  assert.equal(first.items.length, 20);
+  assert.equal(first.hasMore, true);
+  const count = calls.length;
+  const second = await source.search({ page: 2, selectedFilters: filters });
+  assert.equal(second.items.length, 8);
+  assert.equal(second.hasMore, false);
+  assert.equal(calls.length, 29);
+  assert.equal(calls.length - count, 4);
+});
+test('studio and director metadata navigate using IDs while displaying names', async () => {
+  const { source } = fixture({
+    response: {
+      ...movie,
+      production_companies: [{ id: 420, name: 'Studio' }],
+      credits: { crew: [{ id: 62, name: 'Director', job: 'Director' }] },
+    },
+  });
+  const entry = await source.loadDetails({ itemId: 'tmdb-movie-42' });
+  assert.deepEqual(
+    entry.metadata
+      .filter((row) => ['studio', 'director'].includes(row.kind))
+      .map((row) => [row.value, row.filterId, row.filterValue]),
+    [
+      ['Studio', 'studio', '420'],
+      ['Director', 'director', '62'],
+    ],
+  );
+});
 test('TMDB keeps catalogue/search/filter pagination and has no video backend', async () => {
   const { source, calls } = fixture({ response: { results: [movie], page: 1, total_pages: 2 } });
-  assert.equal(source.getFilters().length, 5);
+  assert.deepEqual(
+    source.getFilters().map((filter) => filter.id),
+    ['section', 'collection', 'genre', 'sort', 'year', 'actor', 'director', 'studio'],
+  );
   const result = await source.search({
     page: 1,
     selectedFilters: { genre: ['16'], year: ['2026'], collection: ['top_rated'] },
