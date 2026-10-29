@@ -31,7 +31,11 @@
         "headers"
       ],
       "network": {
-        "origins": ["https://shikimori.io", "https://plapi.cdnvideohub.com"],
+        "origins": [
+          "https://shikimori.io",
+          "https://plapi.cdnvideohub.com",
+          "https://player.cdnvideohub.com"
+        ],
         "imageOrigins": [
           "https://shikimori.io",
           "https://shikimori.one",
@@ -45,6 +49,7 @@
           "https://okcdn.ru"
         ],
         "methods": ["GET"],
+        "userAgentProfile": "browser",
         "maxConcurrentRequests": 4,
         "allowUserBaseUrl": true,
         "allowSubdomains": true,
@@ -53,7 +58,12 @@
       "presentation": {
         "icon": "assets/icon.png",
         "directPlayback": false,
-        "artworkLayout": "portrait"
+        "artworkLayout": "portrait",
+        "imageHeaders": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+          "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+          "Referer": "{baseOrigin}/"
+        }
       },
       "parameters": {}
     }

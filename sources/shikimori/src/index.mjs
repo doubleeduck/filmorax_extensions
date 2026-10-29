@@ -2,9 +2,80 @@ import { text, array, object, first, dedupe, queryUrl, fail } from '../../../sdk
 import { createCdnVideoHub } from '../../../resolvers/cdnvideohub.mjs';
 
 const api = 'https://plapi.cdnvideohub.com/api/v1/player/sv';
+const playerOrigin = 'https://player.cdnvideohub.com';
 const positive = (id) => /^[1-9]\d*$/.test(String(id));
-const siteUrl = (site, path, params = {}) =>
-  queryUrl(site.replace(/\/+$/, '') + '/', text(path).replace(/^\/+/, ''), params);
+const siteUrl = (site, path, params = {}) => {
+  const prefix = new URL(site).pathname.replace(/\/+$/, '');
+  path = text(path);
+  if (prefix && path.startsWith(prefix + '/')) path = path.slice(prefix.length);
+  return queryUrl(site.replace(/\/+$/, '') + '/', path.replace(/^\/+/, ''), params);
+};
+const imageUrl = (site, ...values) => {
+  for (const value of values) {
+    if (!text(value)) continue;
+    try {
+      const uri = new URL(text(value), site);
+      if (['http:', 'https:'].includes(uri.protocol) && !uri.username && !uri.password)
+        return uri.href;
+    } catch {
+      /* Try the next image supplied by the page. */
+    }
+  }
+  return '';
+};
+const ratingRange = (from, to) => {
+  for (const bound of [from, to])
+    if (bound && (!/^\d+(?:\.\d+)?$/.test(bound) || Number(bound) < 1 || Number(bound) > 10))
+      throw fail('Rating must be between 1 and 10', 'invalid_argument');
+  if ((!from && !to) || (from && to && Number(from) > Number(to)))
+    throw fail('Invalid rating range', 'invalid_argument');
+  return `${from}-${to}`;
+};
+const animeId = (value) => {
+  try {
+    return /(?:^|\/)animes\/[a-z]?([1-9]\d*)(?:-|\/?$)/.exec(
+      new URL(text(value), 'https://shikimori.io').pathname,
+    )?.[1];
+  } catch {
+    return '';
+  }
+};
+const filterValues = (filters, id) =>
+  array(filters[id])
+    .map(text)
+    .filter(Boolean)
+    .map((value) =>
+      value.startsWith('exclude:') ? '!' + value.slice(8) : value.replace(/^include:/, ''),
+    );
+export function catalogUrl(site, { page = 1, searchTerm = '', selectedFilters = {} } = {}) {
+  const parts = ['/animes'];
+  for (const id of ['kind', 'status', 'season', 'genre', 'studio']) {
+    const values = filterValues(selectedFilters, id);
+    if (id === 'genre') values.push(...filterValues(selectedFilters, 'theme'));
+    if (values.length) parts.push(id, encodeURIComponent([...new Set(values)].join(',')));
+  }
+  page = Math.max(1, Math.trunc(Number(page)) || 1);
+  if (page > 1) parts.push('page', String(page));
+  const params = { order: first(selectedFilters.order?.[0], 'ranked_shiki') };
+  for (const id of ['duration', 'rating', 'origin', 'licensor']) {
+    const values = filterValues(selectedFilters, id);
+    if (values.length) params[id] = values.join(',');
+  }
+  const from = text(selectedFilters.score_from?.[0]),
+    to = text(selectedFilters.score_to?.[0]);
+  if (from || to) {
+    params.shiki_score = ratingRange(from, to);
+  } else if (text(selectedFilters.score?.[0])) {
+    const score = text(selectedFilters.score[0]);
+    const bounds = /^(\d+(?:\.\d+)?)?-(\d+(?:\.\d+)?)?$/.exec(
+      score.includes('-') ? score : score + '-',
+    );
+    if (!bounds) throw fail('Invalid rating range', 'invalid_argument');
+    params.shiki_score = ratingRange(bounds[1] || '', bounds[2] || '');
+  }
+  if (text(searchTerm)) params.search = text(searchTerm);
+  return siteUrl(site, parts.join('/'), params);
+}
 const select = (id, title, options, kind = 'singleSelect') => ({
   id,
   title,
@@ -16,6 +87,18 @@ const critical = (error) =>
   ['cancelled', 'permission_denied', 'auth_session_changed', 'resource_limit'].includes(
     error?.code,
   );
+const kindValue = (value) =>
+  ({
+    'TV Сериал': 'tv',
+    Фильм: 'movie',
+    OVA: 'ova',
+    ONA: 'ona',
+    Спецвыпуск: 'special',
+    'TV Спецвыпуск': 'tv_special',
+    Клип: 'music',
+    Проморолик: 'pv',
+    Реклама: 'cm',
+  })[value] || value;
 
 export default function createSource(context) {
   let filterCache;
@@ -47,7 +130,7 @@ export default function createSource(context) {
   function item(row, site) {
     row = object(row);
     if (!positive(row.id) || !first(row.russian, row.name) || row.rating === 'rx') return null;
-    const image = first(row.image?.original, row.image?.preview);
+    const image = imageUrl(site, row.poster?.originalUrl, row.image?.original, row.image?.preview);
     const metadata = [];
     const add = (kind, value, filterId = '', filterValue = '') => {
       if (text(value))
@@ -66,6 +149,7 @@ export default function createSource(context) {
       add('genre', first(genre.russian, genre.name), 'genre', String(genre.id));
     for (const studio of array(row.studios))
       add('studio', studio.name, 'studio', String(studio.id));
+    if (Number(row.episodes) > 0) add('episodes', row.episodes);
     return {
       id: `shikimori-${row.id}`,
       webUrl: siteUrl(site, row.url || `/animes/${row.id}`),
@@ -76,7 +160,7 @@ export default function createSource(context) {
       kind: 'anime',
       year,
       rating: Math.min(10, Math.max(0, Number(row.score) || 0)),
-      posterUrl: image ? siteUrl(site, image) : '',
+      posterUrl: image,
       backdropUrl: '',
       isNsfw: false,
       metadata,
@@ -88,94 +172,178 @@ export default function createSource(context) {
   async function getFilters({ refresh = false } = {}) {
     const site = await base();
     if (!refresh && filterCache?.site === site) return filterCache.filters;
-    const [genres, studios] = await Promise.all([
-      get('/api/genres', {}, site),
-      get('/api/studios', {}, site),
-    ]);
+    const response = await request(siteUrl(site, '/animes'), 'text');
+    const data = object(
+      await context.html.extract(
+        text(response.body),
+        {
+          fields: {
+            order: {
+              selector: 'select[data-field="order"] option',
+              all: true,
+              fields: {
+                value: { attr: 'value' },
+                label: { text: true },
+              },
+            },
+            defaultOrder: {
+              selector: 'select[data-field="order"] option[selected]',
+              attr: 'value',
+            },
+            fields: {
+              selector: '.c-ms-field',
+              all: true,
+              fields: {
+                title: { selector: '.c-ms-title', text: true },
+                id: { selector: '.c-ms[data-field]', attr: 'data-field' },
+                options: {
+                  selector: '.c-ms-option',
+                  all: true,
+                  fields: {
+                    value: { attr: 'data-value' },
+                    label: { text: true },
+                  },
+                },
+              },
+            },
+            scores: {
+              selector: '.c-score-preset',
+              all: true,
+              fields: {
+                value: { attr: 'data-range' },
+                label: { text: true },
+              },
+            },
+          },
+        },
+        response.url || site,
+      ),
+    );
+    const pairs = (rows) =>
+      dedupe(
+        array(rows).filter((row) => text(row.value) && text(row.label)),
+        (row) => row.value,
+      ).map((row) => [text(row.value), text(row.label)]);
+    const orders = pairs(data.order);
+    if (!orders.length) throw fail('Shikimori catalogue filters were not found');
     const filters = [
-      select(
-        'order',
-        'source_filter.sort',
-        [
-          ['ranked', 'source_filter.sort.top'],
-          ['popularity', 'source_filter.sort.popular'],
-          ['aired_on', 'source_filter.sort.new'],
-          ['name', 'source_filter.sort.name_latin'],
-        ],
-        'sort',
-      ),
-      select('kind', 'source_filter.type', [
-        ['tv', 'TV'],
-        ['movie', 'Movie'],
-        ['ova', 'OVA'],
-        ['ona', 'ONA'],
-        ['special', 'Special'],
-        ['tv_special', 'TV Special'],
-        ['music', 'Music'],
-      ]),
-      select('status', 'source_filter.status', [
-        ['anons', 'source_filter.status.announced'],
-        ['ongoing', 'source_filter.status.ongoing'],
-        ['released', 'source_filter.status.completed'],
-      ]),
-      select(
-        'genre',
-        'source_filter.genre',
-        array(genres.body)
-          .filter((row) => !row.entry_type || text(row.entry_type).toLowerCase() === 'anime')
-          .filter(
-            (row) => positive(row.id) && !/hentai|эротика/i.test(first(row.russian, row.name)),
-          )
-          .map((row) => [String(row.id), first(row.russian, row.name)]),
-        'multiSelect',
-      ),
-      select(
-        'studio',
-        'source_filter.studio',
-        array(studios.body)
-          .filter((row) => positive(row.id) && text(row.name))
-          .map((row) => [String(row.id), text(row.name)]),
-      ),
-      select(
-        'season',
-        'source_filter.year',
-        Array.from({ length: new Date().getFullYear() - 1959 }, (_, i) => {
-          const year = String(new Date().getFullYear() + 1 - i);
-          return [year, year];
-        }),
-      ),
-      select(
-        'score',
-        'source_filter.score_from',
-        Array.from({ length: 10 }, (_, i) => [String(i + 1), String(i + 1)]),
-      ),
+      {
+        ...select('order', 'Сортировка', orders, 'sort'),
+        defaultValues: [first(data.defaultOrder, orders[0][0])],
+      },
     ];
+    let genre = false;
+    for (const field of array(data.fields)) {
+      let id = text(field.id);
+      if (
+        ![
+          'status',
+          'kind',
+          'genre',
+          'season',
+          'duration',
+          'rating',
+          'origin',
+          'studio',
+          'licensor',
+        ].includes(id)
+      )
+        continue;
+      if (id === 'genre') {
+        if (genre) id = 'theme';
+        genre = true;
+      }
+      const rows = pairs(field.options).filter(
+        ([value, label]) => value !== 'rx' && !/hentai|эротика/i.test(label),
+      );
+      if (rows.length) filters.push(select(id, text(field.title), rows, 'triStateMultiSelect'));
+    }
+    // Only popular studios are embedded in the HTML; include the searchable inventory too.
+    const studio = filters.find((row) => row.id === 'studio');
+    if (studio) {
+      const inventory = await get('/api/studios', {}, new URL(response.url || site).origin).catch(
+        (error) => {
+          if (critical(error)) throw error;
+          return { body: [] };
+        },
+      );
+      const ids = new Set(studio.options.map((row) => row.value.split('-')[0]));
+      for (const row of array(inventory.body)) {
+        if (positive(row.id) && text(row.name) && !ids.has(String(row.id))) {
+          studio.options.push({ value: String(row.id), label: text(row.name) });
+          ids.add(String(row.id));
+        }
+      }
+    }
+    const scores = pairs(data.scores);
+    if (scores.length) filters.push(select('score', 'Рейтинг', scores));
+    for (const [id, title] of [
+      ['score_from', 'Рейтинг от'],
+      ['score_to', 'Рейтинг до'],
+    ])
+      filters.push({
+        id,
+        title,
+        kind: 'text',
+        placeholder: '1–10',
+        isAvailableWithSearchTerm: true,
+      });
     filterCache = { site, filters };
     return filters;
   }
   async function search({ page = 1, searchTerm = '', selectedFilters = {} } = {}) {
-    page = Math.max(1, Math.trunc(Number(page)) || 1);
-    const params = {
-      page,
-      limit: 20,
-      order: first(selectedFilters.order?.[0], 'ranked'),
-      censored: true,
-    };
-    if (text(searchTerm)) params.search = text(searchTerm);
-    for (const id of ['kind', 'status', 'genre', 'studio', 'season', 'score']) {
-      const values = array(selectedFilters[id]).map(text).filter(Boolean);
-      if (values.length) params[id] = values.join(',');
-    }
-    const response = await get('/api/animes', params);
-    const rows = array(response.body);
+    const site = await base();
+    const response = await request(catalogUrl(site, { page, searchTerm, selectedFilters }), 'text');
+    const mirror = new URL(site),
+      finalUrl = new URL(response.url || site);
+    mirror.protocol = finalUrl.protocol;
+    mirror.host = finalUrl.host;
+    const target = mirror.href.replace(/\/+$/, '');
+    const data = object(
+      await context.html.extract(
+        text(response.body),
+        {
+          fields: {
+            cards: {
+              selector: 'article.b-catalog_entry',
+              all: true,
+              fields: {
+                url: { selector: 'a.title', attr: 'href' },
+                russian: { selector: '.name-ru', text: true },
+                name: { selector: '.name-en', text: true },
+                title: { selector: 'a.title', attr: 'title' },
+                image: { selector: 'picture img, img', attr: 'src' },
+                lazyImage: { selector: 'img[data-src]', attr: 'data-src' },
+                poster: { selector: 'meta[itemprop="image"]', attr: 'content' },
+                date: { selector: 'meta[itemprop="dateCreated"]', attr: 'content' },
+                kind: { selector: '.misc span', text: true },
+                score: { selector: '.collection_score', text: true },
+              },
+            },
+            next: { selector: '.pagination a.link-next[href]:not(.disabled)', attr: 'href' },
+          },
+        },
+        response.url || site,
+      ),
+    );
+    const rows = array(data.cards).map((row) => ({
+      id: animeId(row.url),
+      url: row.url,
+      russian: row.russian,
+      name: first(row.name, row.title),
+      image: { original: imageUrl(response.url || target, row.lazyImage, row.image, row.poster) },
+      aired_on: row.date,
+      kind: kindValue(row.kind),
+      score: /\d+(?:[.,]\d+)?/.exec(text(row.score))?.[0]?.replace(',', '.'),
+    }));
     return {
-      items: dedupe(rows.map((row) => item(row, response.site)).filter(Boolean), (row) => row.id),
-      hasMore: rows.length === 20,
+      items: dedupe(rows.map((row) => item(row, target)).filter(Boolean), (row) => row.id),
+      hasMore: !!text(data.next),
     };
   }
   async function playbackGroups(entry, site) {
     const watch = await request(
-      new URL(new URL(entry.webUrl).pathname + '/watch', site).href,
+      new URL(new URL(entry.webUrl).pathname.replace(/\/+$/, '') + '/watch', site).href,
       'text',
     );
     const origin = new URL(watch.url || site).origin;
@@ -209,25 +377,26 @@ export default function createSource(context) {
     );
     const groups = new Map();
     for (const row of array(data.items)) {
-      if (!text(row.vkId)) continue;
+      if (!/^[\w-]+$/.test(text(row.vkId))) continue;
       const voice = first(row.voiceStudio, 'Original'),
-        season = Number(row.season) || 1,
-        episode = Number(row.episode) || 1;
-      if (season < 1 || episode < 1) continue;
-      const key = voice;
+        season = data.isSerial === false ? 1 : Number(row.season ?? 1),
+        episode = data.isSerial === false ? 1 : Number(row.episode ?? 1);
+      if (!Number.isInteger(season) || !Number.isInteger(episode) || season < 1 || episode < 1)
+        continue;
+      const key = voice + (text(row.voiceType) ? ` · ${text(row.voiceType)}` : '');
       if (!groups.has(key))
         groups.set(key, {
           id: `shikimori-cdnvh-${encodeURIComponent(key)}`,
-          title: voice,
+          title: key,
           playerId: 'cdnVideoHub',
           playerLabel: 'CDNVideoHub',
           episodes: [],
         });
       groups.get(key).episodes.push({
         id: `shikimori-${tag.title}-${season}-${episode}-${row.vkId}`,
-        title: `Episode ${episode}`,
-        season,
-        number: episode,
+        title: `Серия ${episode}`,
+        season: String(season),
+        number: String(episode),
         url: `${api}/video/${encodeURIComponent(row.vkId)}`,
       });
     }
@@ -255,11 +424,16 @@ export default function createSource(context) {
   }
   async function loadPlaybackGroups({ itemId, url } = {}) {
     const site = await base();
-    const id =
-      /^shikimori-([1-9]\d*)$/.exec(itemId)?.[1] ||
-      /^\/animes\/([1-9]\d*)(?:-|$)/.exec(new URL(text(url), site).pathname)?.[1];
+    const id = /^shikimori-([1-9]\d*)$/.exec(itemId)?.[1] || animeId(url);
     if (!id) return [];
-    return playbackGroups({ webUrl: siteUrl(site, '/animes/' + id) }, site);
+    let path = '';
+    if (
+      animeId(url) === id &&
+      /(?:^|\/)animes\/[a-z]?\d+-[^/]+\/?$/.test(new URL(url, site).pathname)
+    )
+      path = new URL(url, site).pathname;
+    else path = text(object((await get('/api/animes/' + id, {}, site)).body).url);
+    return path ? playbackGroups({ webUrl: siteUrl(site, path) }, site) : [];
   }
   async function loadDetails({ itemId }) {
     const id = /^shikimori-([1-9]\d*)$/.exec(itemId)?.[1];
@@ -267,7 +441,7 @@ export default function createSource(context) {
     const response = await get(`/api/animes/${id}`),
       entry = item(response.body, response.site);
     if (!entry) return null;
-    const [similar, groups] = await Promise.all([
+    const [similar, groups, page] = await Promise.all([
       recommendations(id, response.site).catch((error) => {
         if (critical(error)) throw error;
         return [];
@@ -276,7 +450,31 @@ export default function createSource(context) {
         if (critical(error)) throw error;
         return [];
       }),
+      request(entry.webUrl, 'text').catch((error) => {
+        if (critical(error)) throw error;
+        return null;
+      }),
     ]);
+    if (page) {
+      const artwork = object(
+        await context.html.extract(
+          text(page.body),
+          {
+            fields: {
+              image: { selector: '.c-poster picture img, .c-image picture img', attr: 'src' },
+              meta: { selector: 'meta[property="og:image"]', attr: 'content' },
+              score: { selector: '.b-rate .score-value', text: true },
+            },
+          },
+          page.url || entry.webUrl,
+        ),
+      );
+      const image = imageUrl(page.url || entry.webUrl, artwork.image, artwork.meta);
+      if (image) entry.posterUrl = image;
+      const score = Number(text(artwork.score).replace(',', '.'));
+      if (text(artwork.score) && Number.isFinite(score) && score >= 0 && score <= 10)
+        entry.rating = score;
+    }
     const description = text(response.body.description_html);
     entry.overview = description
       ? text((await context.html.text([description]))[0])
@@ -298,7 +496,9 @@ export default function createSource(context) {
       ...result,
       variants: result.variants.map((variant) => ({
         ...variant,
-        headers: { ...variant.headers, Origin: origin, Referer: origin + '/' },
+        // The API runs in the site document, but media requests originate from
+        // CDNVideoHub's iframe. OK CDN rejects the catalogue's Origin with 400.
+        headers: { ...variant.headers, Origin: playerOrigin, Referer: playerOrigin + '/' },
       })),
     };
   }
