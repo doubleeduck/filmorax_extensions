@@ -212,7 +212,7 @@ test('TMDB cast uses the details response, safe mirrored portraits and optional 
   assert.equal(portrait.host, 'wsrv.nl');
   assert.equal(portrait.searchParams.get('url'), 'https://image.tmdb.org/t/p/w185/actor.jpg');
   assert.equal(item.cast[1].imageUrl, '');
-  assert.deepEqual(item.cast[0].catalogFilters, { actor: ['42'], section: ['all'] });
+  assert.deepEqual(item.cast[0].catalogFilters, { actor: ['42'], section: ['movie'] });
 });
 
 test('TV aggregate cast covers seasons and merges character names without duplicate actors', async () => {
@@ -235,6 +235,7 @@ test('TV aggregate cast covers seasons and merges character names without duplic
   const item = await source.loadDetails({ itemId: 'tmdb-tv-42' });
   assert.equal(item.cast[0].name, 'Whole show');
   assert.equal(item.cast[0].character, 'Hero, Guest');
+  assert.deepEqual(item.cast[0].catalogFilters, { actor: ['8'], section: ['movie'] });
   assert.equal(calls.length, 1);
   assert.match(new URL(calls[0].url).searchParams.get('append_to_response'), /aggregate_credits/);
 });
@@ -249,6 +250,41 @@ const filmography = Array.from({ length: 43 }, (_, index) => ({
   genre_ids: [16],
   vote_average: 8,
 }));
+
+test('actor navigation from movie and TV details opens films and allows switching to TV or all', async () => {
+  for (const type of ['movie', 'tv']) {
+    const { source, calls } = fixture({
+      response: (input) =>
+        new URL(input.url).pathname.includes('/person/')
+          ? { cast: filmography }
+          : {
+              ...movie,
+              name: 'Show',
+              credits: { cast: [{ id: 42, name: 'Actor' }] },
+            },
+    });
+    const item = await source.loadDetails({ itemId: `tmdb-${type}-42` });
+    const selectedFilters = item.cast[0].catalogFilters;
+    assert.deepEqual(selectedFilters, { actor: ['42'], section: ['movie'] });
+    const first = await source.search({ selectedFilters });
+    const second = await source.search({ page: 2, selectedFilters });
+    assert.equal(first.items.length, 20);
+    assert.equal(first.hasMore, true);
+    assert.equal(second.items.length, 2);
+    assert.equal(second.hasMore, false);
+    assert.ok([...first.items, ...second.items].every((row) => row.kind === 'movie'));
+    for (const [section, kinds] of [
+      ['tv', ['series']],
+      ['all', ['movie', 'series']],
+    ]) {
+      const result = await source.search({
+        selectedFilters: { ...selectedFilters, section: [section] },
+      });
+      assert.deepEqual([...new Set(result.items.map((row) => row.kind))], kinds);
+    }
+    assert.equal(calls.length, 2, 'filmography is reused when changing section/page');
+  }
+});
 test('actor catalogue combines movies and TV, deduplicates credits, excludes crew, paginates and reuses completed data', async () => {
   const { source, calls } = fixture({
     response: {

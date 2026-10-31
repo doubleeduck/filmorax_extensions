@@ -121,6 +121,19 @@ const filters = () => [
   })),
 ];
 const cleanBase = (value) => text(value).replace(/\/+$/, '');
+// The public API gateways used by Lampa's TMDB proxy and its CUB mirrors.
+// Keep these in the extension: the host only enforces the manifest's grants.
+const lampaApiMirrors = {
+  'cub.black': 'https://apitmdb.cub.black',
+  'cubnotrip.top': 'https://apitmdb.cubnotrip.top',
+};
+const lampaImageMirrors = [
+  'https://nl.imagetmdb.com',
+  'https://imagetmdb.com',
+  'https://de.imagetmdb.com',
+  'https://pl.imagetmdb.com',
+  'https://lampa.byskaz.ru/tmdb/img',
+];
 const validMirror = (value) => {
   try {
     const url = new URL(value);
@@ -137,8 +150,16 @@ const validMirror = (value) => {
 };
 function route(mode, mirror, official, path) {
   if (mode === 'directMirror' && validMirror(mirror)) return `${cleanBase(mirror)}${path}`;
-  if (mode === 'lampaProxy' && validMirror(mirror))
+  if (mode === 'lampaProxy' && validMirror(mirror)) {
+    const base = cleanBase(mirror);
+    // Lampa's built-in gateways replace the origin; custom forwarding proxies
+    // retain the original URL in the path. Both formats remain supported.
+    const gateways = [...Object.values(lampaApiMirrors), ...lampaImageMirrors];
+    if (gateways.includes(base)) return `${base}${path}`;
+    if (path.startsWith('/3/') && gateways.includes(base.replace(/\/3$/, '')))
+      return `${base}${path.slice(2)}`;
     return `${cleanBase(mirror)}/${official}${path}`;
+  }
   return `${official}${path}`;
 }
 function routing(config, params) {
@@ -150,8 +171,33 @@ function routing(config, params) {
   const imageMode = options['tmdb.image_mirror_mode'] ?? 'publicImageRelay';
   const apiMirror = options['tmdb.api_mirror_url'] ?? legacy,
     imageMirror = options['tmdb.image_mirror_url'] ?? '';
+  const selectedServer = options['tmdb.api_lampa_server'];
+  const server = Object.prototype.hasOwnProperty.call(lampaApiMirrors, selectedServer)
+    ? selectedServer
+    : 'auto';
+  // An existing custom proxy URL keeps working with the default selection.
+  const autoLampa = apiMode === 'lampaProxy' && server === 'auto' && !validMirror(apiMirror);
+  const apiBases =
+    apiMode !== 'lampaProxy'
+      ? []
+      : lampaApiMirrors[server]
+        ? [lampaApiMirrors[server]]
+        : autoLampa
+          ? Object.values(lampaApiMirrors)
+          : [apiMirror];
+  const apiUrls = (path) =>
+    apiBases.length
+      ? apiBases.map((base) => route('lampaProxy', base, api, path))
+      : [route(apiMode, apiMirror, api, path)];
   return {
-    api: (path) => route(apiMode, apiMirror, api, path),
+    api: (path) => apiUrls(path)[0],
+    apiUrls,
+    autoLampa,
+    publicLampa:
+      apiMode === 'lampaProxy' &&
+      apiBases.every((base) =>
+        Object.values(lampaApiMirrors).includes(cleanBase(base).replace(/\/3$/, '')),
+      ),
     image: (path, width) => {
       path = text(path);
       if (!path) return '';
@@ -159,7 +205,14 @@ function routing(config, params) {
       const original = `${image}/t/p/w${width}${path}`;
       return imageMode === 'publicImageRelay'
         ? queryUrl(params.imageRelay, '/', { url: original })
-        : route(imageMode, imageMirror, image, `/t/p/w${width}${path}`);
+        : route(
+            imageMode,
+            imageMode === 'lampaProxy' && !validMirror(imageMirror)
+              ? lampaImageMirrors[0]
+              : imageMirror,
+            image,
+            `/t/p/w${width}${path}`,
+          );
     },
   };
 }
@@ -281,7 +334,7 @@ function mapItem(data, type, routes, details = false) {
                 names(array(person.roles).map((role) => role.character)).join(', '),
               ),
               imageUrl: routes.image(person.profile_path, 185),
-              catalogFilters: { actor: [String(person.id)], section: ['all'] },
+              catalogFilters: { actor: [String(person.id)], section: ['movie'] },
             })),
           (person) => person.id,
         ).slice(0, 300)
@@ -353,15 +406,20 @@ export default function createSource(context) {
   // Completed responses only: concurrent calls retain independent cancellation.
   const filmographies = new Map(),
     companies = new Map();
+  let preferredLampaOrigin = '';
   async function configuration() {
     return routing(await context.settings.network(), context.parameters);
   }
-  async function credential() {
+  async function credential(routes) {
+    // Public Lampa gateways use Lampa's bundled public key, never a user's
+    // personal TMDB credentials. They do not receive auth-origin grants.
+    if (routes.publicLampa) return '';
     const session = await context.auth.getSession({ includeAccessToken: true });
     return text(session.accessToken).replace(/^(?:Bearer\s+)+/i, '');
   }
   async function get(path, params, routes, accessToken) {
-    accessToken ??= await credential();
+    if (routes.publicLampa) accessToken = '';
+    else accessToken ??= await credential(routes);
     const headers = { Accept: 'application/json' };
     params = {
       language: context.parameters.language,
@@ -371,14 +429,37 @@ export default function createSource(context) {
     if (!accessToken || /^[a-fA-F0-9]{32}$/.test(accessToken))
       params.api_key = accessToken || context.parameters.defaultApiKey;
     else headers.Authorization = `Bearer ${accessToken}`;
-    const url = new URL(routes.api(path));
-    for (const [key, value] of Object.entries(params))
-      if (value != null && value !== '') url.searchParams.set(key, String(value));
-    // Explicit credential errors are not silently retried with the shared key.
-    return object(
-      (await context.http.request({ method: 'GET', url: url.href, responseType: 'json', headers }))
-        .body,
-    );
+    const urls = routes.apiUrls(path);
+    if (routes.autoLampa && preferredLampaOrigin)
+      urls.sort(
+        (a, b) =>
+          Number(new URL(b).origin === preferredLampaOrigin) -
+          Number(new URL(a).origin === preferredLampaOrigin),
+      );
+    for (let index = 0; index < urls.length; index++) {
+      const url = new URL(urls[index]);
+      for (const [key, value] of Object.entries(params))
+        if (value != null && value !== '') url.searchParams.set(key, String(value));
+      try {
+        const response = await context.http.request({
+          method: 'GET',
+          url: url.href,
+          responseType: 'json',
+          headers,
+          ...(routes.autoLampa ? { timeoutMs: 4000 } : {}),
+        });
+        if (routes.autoLampa) preferredLampaOrigin = url.origin;
+        return object(response.body);
+      } catch (error) {
+        // Only the automatic gateway pool retries transport/server failures.
+        // Cancellation, permission/credential errors and rate limits surface
+        // immediately. Every attempt uses exactly the same key or token.
+        const retryable =
+          ['network', 'offline', 'timeout'].includes(error?.code) ||
+          (error?.code === 'invalid_response' && (!error.httpStatus || error.httpStatus >= 500));
+        if (!routes.autoLampa || !retryable || index === urls.length - 1) throw error;
+      }
+    }
   }
   function order(rows, collection, sort = '') {
     const date = (row) => Date.parse(row.release_date ?? row.first_air_date ?? '') || 0;
@@ -422,7 +503,7 @@ export default function createSource(context) {
     const valid = (id) => !id || /^[1-9]\d{0,9}$/.test(id);
     const studio = text(filters.studio?.[0]);
     if (![actor, director, studio].every(valid)) return { items: [], hasMore: false };
-    const accessToken = await credential();
+    const accessToken = await credential(routes);
     const [acting, directing] = await Promise.all([
       actor ? cachedCredits(actor, routes, accessToken) : null,
       director && director !== actor ? cachedCredits(director, routes, accessToken) : null,

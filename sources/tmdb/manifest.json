@@ -40,9 +40,13 @@
         "region": "RU"
       },
       "network": {
-        "origins": ["https://api.themoviedb.org"],
+        "origins": [
+          "https://api.themoviedb.org",
+          "https://apitmdb.cub.black",
+          "https://apitmdb.cubnotrip.top"
+        ],
         "webOrigins": ["https://www.themoviedb.org"],
-        "imageOrigins": ["https://image.tmdb.org", "https://wsrv.nl"],
+        "imageOrigins": ["https://image.tmdb.org", "https://wsrv.nl", "https://nl.imagetmdb.com"],
         "streamOrigins": [],
         "authOrigins": ["https://api.themoviedb.org"],
         "methods": ["GET"],
@@ -86,7 +90,7 @@
             {
               "value": "lampaProxy",
               "label": "source.mirrors.lampa_proxy",
-              "description": "source.mirrors.lampa_proxy_subtitle"
+              "description": "Готовые серверы Lampa. Используют публичный ключ; личный токен TMDB им не передаётся."
             }
           ]
         },
@@ -95,11 +99,30 @@
           "label": "source.mirrors.api_url",
           "kind": "url",
           "defaultValue": "",
-          "required": true,
+          "required": false,
           "visibleWhen": {
             "id": "tmdb.api_mirror_mode",
             "values": ["directMirror", "lampaProxy"]
           }
+        },
+        {
+          "id": "tmdb.api_lampa_server",
+          "label": "Сервер Lampa",
+          "kind": "select",
+          "defaultValue": "auto",
+          "visibleWhen": {
+            "id": "tmdb.api_mirror_mode",
+            "values": ["lampaProxy"]
+          },
+          "options": [
+            {
+              "value": "auto",
+              "label": "Автоматически / свой адрес API",
+              "description": "Если адрес API пустой, используется доступный сервер Lampa. Для своего прокси укажите адрес API выше."
+            },
+            { "value": "cub.black", "label": "CUB · cub.black" },
+            { "value": "cubnotrip.top", "label": "CUB · cubnotrip.top" }
+          ]
         },
         {
           "id": "tmdb.image_mirror_mode",
@@ -124,7 +147,7 @@
             {
               "value": "lampaProxy",
               "label": "source.mirrors.lampa_proxy",
-              "description": "source.mirrors.lampa_proxy_subtitle"
+              "description": "Постеры через nl.imagetmdb.com. Можно указать свой адрес прокси изображений."
             }
           ]
         },
@@ -133,7 +156,7 @@
           "label": "source.mirrors.image_url",
           "kind": "url",
           "defaultValue": "",
-          "required": true,
+          "required": false,
           "visibleWhen": {
             "id": "tmdb.image_mirror_mode",
             "values": ["directMirror", "lampaProxy"]
