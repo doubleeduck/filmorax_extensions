@@ -129,6 +129,7 @@ define('__mlInitialize', async (config) => {
   const context = freeze({
     sourceId: definition.id,
     baseUrl: definition.baseUrl,
+    supportsExternalMediaIds: true,
     parameters: definition.parameters ?? {},
     http: { request: (input) => call('http', input) },
     html: {

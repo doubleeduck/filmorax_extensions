@@ -87,6 +87,7 @@ const critical = (error) =>
   ['cancelled', 'permission_denied', 'auth_session_changed', 'resource_limit'].includes(
     error?.code,
   );
+const regionNotice = 'В вашем регионе контент недоступен';
 const kindValue = (value) =>
   ({
     'TV Сериал': 'tv',
@@ -346,6 +347,7 @@ export default function createSource(context) {
       new URL(new URL(entry.webUrl).pathname.replace(/\/+$/, '') + '/watch', site).href,
       'text',
     );
+    if (text(watch.body) === regionNotice) throw fail(regionNotice, 'access_denied');
     const origin = new URL(watch.url || site).origin;
     const tag = object(
       await context.html.extract(
@@ -441,6 +443,7 @@ export default function createSource(context) {
     const response = await get(`/api/animes/${id}`),
       entry = item(response.body, response.site);
     if (!entry) return null;
+    let playbackNotice;
     const [similar, groups, page] = await Promise.all([
       recommendations(id, response.site).catch((error) => {
         if (critical(error)) throw error;
@@ -448,6 +451,11 @@ export default function createSource(context) {
       }),
       playbackGroups(entry, response.site).catch((error) => {
         if (critical(error)) throw error;
+        if (
+          error?.code === 'access_denied' &&
+          (text(error.body) === regionNotice || error.message === regionNotice)
+        )
+          playbackNotice = regionNotice;
         return [];
       }),
       request(entry.webUrl, 'text').catch((error) => {
@@ -464,6 +472,14 @@ export default function createSource(context) {
               image: { selector: '.c-poster picture img, .c-image picture img', attr: 'src' },
               meta: { selector: 'meta[property="og:image"]', attr: 'content' },
               score: { selector: '.b-rate .score-value', text: true },
+              ...(context.supportsExternalMediaIds
+                ? {
+                    mal: {
+                      selector: '.b-external_link.myanimelist [data-href]',
+                      attr: 'data-href',
+                    },
+                  }
+                : {}),
             },
           },
           page.url || entry.webUrl,
@@ -471,6 +487,12 @@ export default function createSource(context) {
       );
       const image = imageUrl(page.url || entry.webUrl, artwork.image, artwork.meta);
       if (image) entry.posterUrl = image;
+      const malId = Number(
+        /^https:\/\/(?:www\.)?myanimelist\.net\/anime\/([1-9]\d*)(?:[/?#]|$)/i.exec(
+          text(artwork.mal),
+        )?.[1],
+      );
+      if (context.supportsExternalMediaIds && malId <= 2147483647) entry.malId = malId;
       const score = Number(text(artwork.score).replace(',', '.'));
       if (text(artwork.score) && Number.isFinite(score) && score >= 0 && score <= 10)
         entry.rating = score;
@@ -481,6 +503,12 @@ export default function createSource(context) {
       : text(response.body.description).replace(/\[\/?[^\]]+\]/g, '');
     entry.relatedItems = similar;
     entry.playbackGroups = groups;
+    if (playbackNotice)
+      entry.metadata.push({
+        kind: 'status',
+        labelKey: 'media.metadata.status',
+        value: playbackNotice,
+      });
     return entry;
   }
   async function resolveStream({ url }) {

@@ -163,12 +163,13 @@ function groups(slug, info, rows) {
     })
     .filter((group) => group.episodes.length);
 }
-function item(data, overview, episodes) {
+function item(data, overview, episodes, externalIds = false) {
   const slug = text(data.slug),
     title = first(data.title?.english, data.title?.romaji, data.title?.native);
   if (!/^[a-zA-Z0-9]+$/.test(slug) || !title) return null;
   const genres = array(data.genres).map(text).filter(Boolean),
     format = text(data.format);
+  const malId = Number(data.idMal ?? data.malId);
   const year =
     Number.isInteger(Number(data.year)) && Number(data.year) >= 1800 ? Number(data.year) : null;
   const relatedItems =
@@ -191,6 +192,9 @@ function item(data, overview, episodes) {
     webUrl: `https://anikage.cc/anime/info/${encodeURIComponent(slug)}`,
     title,
     originalTitle: text(data.title?.romaji),
+    ...(externalIds && Number.isInteger(malId) && malId > 0 && malId <= 2147483647
+      ? { malId }
+      : {}),
     subtitle: [year && String(year), format].filter(Boolean).join(' · '),
     overview,
     kind: format === 'MOVIE' ? 'movie' : 'anime',
@@ -235,7 +239,12 @@ export default function createSource(context) {
   const plain = async (value) =>
     text(value) ? text(await context.html.extract(text(value), { text: true })) : '';
   async function parsed(data, episodes) {
-    return item(object(data), await plain(data?.description), episodes);
+    return item(
+      object(data),
+      await plain(data?.description),
+      episodes,
+      context.supportsExternalMediaIds,
+    );
   }
   async function search({ page = 1, searchTerm = '', selectedFilters = {} } = {}) {
     const f = selectedFilters,

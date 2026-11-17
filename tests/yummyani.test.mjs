@@ -79,6 +79,44 @@ test('video API errors propagate instead of marking a playable title unavailable
   );
 });
 
+test('YummyAni retries a transient video failure and still loads episodes without recommendations', async () => {
+  let attempts = 0;
+  const source = createSource({
+    baseUrl: 'https://ru.yummyani.me/api',
+    parameters: { siteOrigin: 'https://ru.yummyani.me' },
+    settings: { network: async () => ({}) },
+    http: {
+      request: async ({ url, timeoutMs }) => {
+        if (new URL(url).pathname.endsWith('/recommendations')) {
+          assert.equal(timeoutMs, 3000);
+          throw Object.assign(new Error('Recommendations are slow'), { code: 'timeout' });
+        }
+        if (url.endsWith('/videos')) {
+          assert.equal(timeoutMs, 8000);
+          if (++attempts === 1) throw Object.assign(new Error('Timeout'), { code: 'timeout' });
+          return {
+            body: {
+              response: [
+                {
+                  video_id: 1,
+                  number: 148,
+                  iframe_url: 'https://kodikplayer.com/seria/123/hash/720p?episode=148',
+                  data: { dubbing: 'Voice' },
+                },
+              ],
+            },
+          };
+        }
+        return { body: { response: { anime_url: 'fixture', anime_id: 42, title: 'Fixture' } } };
+      },
+    },
+  });
+  const details = await source.loadDetails({ itemId: 'yummyani-fixture' });
+  assert.equal(attempts, 2);
+  assert.equal(details.playbackGroups[0].episodes[0].number, '148');
+  assert.deepEqual(details.relatedItems, []);
+});
+
 test('posters prefer the optimized native WebP size and keep legacy fallbacks', () => {
   const base = { anime_url: 'film', title: 'Film' };
   assert.equal(

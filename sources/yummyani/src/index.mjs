@@ -1,4 +1,4 @@
-import { text, array, object, first, dedupe, queryUrl } from '../../../sdk/video.mjs';
+import { text, array, object, first, dedupe, queryUrl, fail } from '../../../sdk/video.mjs';
 import { createKodik, isKodik } from '../../../resolvers/kodik.mjs';
 import { createCdnVideoHub, isCdnVideoHub } from '../../../resolvers/cdnvideohub.mjs';
 import { createCollaps, isCollaps } from '../../../resolvers/collaps.mjs';
@@ -21,7 +21,7 @@ export default function createSource(context) {
     kodik = createKodik(context),
     cdn = createCdnVideoHub(context),
     collaps = createCollaps(context);
-  async function get(path, params = {}, referer) {
+  async function get(path, params = {}, referer, timeoutMs) {
     const config = await context.settings.network(),
       raw = (config.baseUrl || context.baseUrl).replace(/\/+$/, '');
     const api = raw.endsWith('/api') ? raw : raw + '/api';
@@ -31,6 +31,7 @@ export default function createSource(context) {
         url: queryUrl(api + '/', path.replace(/^\//, ''), params),
         responseType: 'json',
         userAgentProfile: 'browser',
+        ...(timeoutMs ? { timeoutMs } : {}),
         headers: {
           Accept: 'application/json,image/webp,image/avif',
           'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
@@ -203,25 +204,27 @@ export default function createSource(context) {
     const base = await site();
     const value = slug(itemId.startsWith('yummyani-') ? itemId.slice(9) : itemId);
     if (!value) return null;
-    const response = object(
-        await get(`/anime/${encodeURIComponent(value)}`, {}, `${base}/catalog/item/${value}`),
-      ),
+    const referer = `${base}/catalog/item/${value}`;
+    const response = object(await get(`/anime/${encodeURIComponent(value)}`, {}, referer, 8000)),
       data = { ...object(response.response) };
     const animeId = text(data.anime_id);
     if (animeId) {
+      const path = `/anime/${encodeURIComponent(animeId)}`;
+      const fetchVideos = () => get(path + '/videos', {}, referer, 8000);
       const [videos, related] = await Promise.all([
-        get(`/anime/${encodeURIComponent(animeId)}/videos`, {}, `${base}/catalog/item/${value}`),
-        soft(
-          () =>
-            get(
-              `/anime/${encodeURIComponent(animeId)}/recommendations`,
-              { limit: 12, offset: 0 },
-              `${base}/catalog/item/${value}`,
-            ),
-          {},
-        ),
+        fetchVideos().catch((error) => {
+          if (
+            ['timeout', 'network'].includes(error?.code) ||
+            [502, 503, 504].includes(error?.httpStatus)
+          )
+            return fetchVideos();
+          throw error;
+        }),
+        soft(() => get(path + '/recommendations', { limit: 12, offset: 0 }, referer, 3000), {}),
       ]);
-      data.videos = array(videos?.response);
+      if (!Array.isArray(videos?.response))
+        throw fail('YummyAni returned an invalid episode list', 'invalid_response');
+      data.videos = videos.response;
       data.relatedItems = extractItems(related);
     }
     return item(data, base, true);

@@ -17,7 +17,8 @@ export function isCollaps(input) {
       (uri.protocol === 'collaps:' && uri.hostname === 'embed') ||
       (uri.protocol === 'https:' &&
         uri.pathname.startsWith('/embed/') &&
-        collapsHosts.some((host) => uri.hostname === host || uri.hostname.endsWith('.' + host)))
+        (uri.host === 'api.embf.net' ||
+          collapsHosts.some((host) => uri.hostname === host || uri.hostname.endsWith('.' + host))))
     );
   } catch {
     return false;

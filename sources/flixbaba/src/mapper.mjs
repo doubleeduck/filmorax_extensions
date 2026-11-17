@@ -124,7 +124,7 @@ function groups(data, type, title, year) {
     }),
   }));
 }
-export function item(data, type, details = false) {
+export function item(data, type, details = false, externalIds = false) {
   data = object(data);
   const id = Number(data.id),
     tv = type === 'tv',
@@ -161,6 +161,10 @@ export function item(data, type, details = false) {
   return {
     id: `flixbaba-${type}-${id}-${slug(title)}`,
     title,
+    originalTitle: text(data[tv ? 'original_name' : 'original_title']),
+    ...(externalIds && /^tt\d{7,12}$/.test(text(data.external_ids?.imdb_id))
+      ? { imdbId: data.external_ids.imdb_id }
+      : {}),
     kind: tv ? 'series' : 'movie',
     subtitle: [
       year ? String(year) : '',

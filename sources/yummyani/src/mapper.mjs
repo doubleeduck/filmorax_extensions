@@ -184,6 +184,7 @@ export function item(value, base, details = false) {
     id: `yummyani-${id}`,
     webUrl: new URL('/catalog/item/' + encodeURIComponent(id), base).href,
     title,
+    originalTitle: pick(data, ['eng_name', 'original_title']),
     subtitle: join([
       pick(data.type, ['title', 'name', 'label']),
       year ? String(year) : '',

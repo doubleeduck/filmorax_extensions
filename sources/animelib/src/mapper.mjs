@@ -176,6 +176,7 @@ export function item(data, authorized = false, related = true) {
     id: `animelib-${id}`,
     webUrl: 'https://animelib.org/ru/anime/' + encodeURIComponent(id),
     title,
+    originalTitle: localized(data.eng_name),
     kind: 'anime',
     subtitle: join([
       localized(data.type?.label ?? data.type?.name),

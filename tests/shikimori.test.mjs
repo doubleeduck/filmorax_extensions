@@ -105,6 +105,7 @@ function fixture(config = {}) {
   const currentTitle = { ...title, ...config.title };
   const context = {
     baseUrl: 'https://shikimori.io',
+    supportsExternalMediaIds: config.externalIds,
     settings: { network: async () => config },
     html: {
       text: async () => ['Story'],
@@ -137,6 +138,7 @@ function fixture(config = {}) {
           body = JSON.stringify({
             image: '//shikimori.io/uploads/poster/current.jpeg',
             score: '8.91',
+            mal: 'https://myanimelist.net/anime/52991/Sousou_no_Frieren',
           });
         else if (uri.pathname.endsWith('/playlist'))
           body = {
@@ -179,6 +181,13 @@ function fixture(config = {}) {
   };
   return { source: createSource(context), calls };
 }
+test('Shikimori exposes the linked MyAnimeList ID to supporting hosts', async () => {
+  const itemId = 'shikimori-' + title.id;
+  const modern = await fixture({ externalIds: true }).source.loadDetails({ itemId });
+  const legacy = await fixture().source.loadDetails({ itemId });
+  assert.equal(modern.malId, 52991);
+  assert.equal(Object.hasOwn(legacy, 'malId'), false);
+});
 test('non-NSFW Shikimori has an icon, catalogue and an explicitly permitted shared player', async () => {
   const manifest = JSON.parse(
     await readFile(new URL('../sources/shikimori/manifest.json', import.meta.url)),
@@ -445,4 +454,25 @@ test('optional player outages retain metadata but cancellation and permission er
     const { source } = fixture({ error: failWatch(code) });
     await assert.rejects(source.loadDetails({ itemId: 'shikimori-52991' }), { code });
   }
+});
+
+test('a regional restriction on the watch page retains the title and identifies the restriction', async () => {
+  const message = 'В вашем регионе контент недоступен';
+  const { source, calls } = fixture({
+    error: (input) =>
+      new URL(input.url).pathname.endsWith('/watch')
+        ? Object.assign(new Error('HTTP 403'), {
+            code: 'access_denied',
+            httpStatus: 403,
+            body: message,
+          })
+        : null,
+  });
+  const entry = await source.loadDetails({ itemId: 'shikimori-52991' });
+  assert.deepEqual(entry.playbackGroups, []);
+  assert.ok(entry.metadata.some((row) => row.kind === 'status' && row.value === message));
+  await assert.rejects(source.loadPlaybackGroups({ itemId: 'shikimori-52991' }), {
+    code: 'access_denied',
+  });
+  assert.ok(calls.every((call) => !new URL(call.url).pathname.endsWith('/playlist')));
 });

@@ -3,6 +3,7 @@ export type Json = null | boolean | number | string | Json[] | { [key: string]: 
 export interface SourceContext {
   readonly sourceId: string;
   readonly baseUrl: string;
+  readonly supportsExternalMediaIds?: true;
   readonly parameters: Readonly<Record<string, string>>;
   readonly http: {
     request(input: {
@@ -98,6 +99,9 @@ export interface Title {
   title: string;
   kind: 'movie' | 'series' | 'anime';
   originalTitle?: string;
+  /** Only return these IDs when context.supportsExternalMediaIds is true. */
+  imdbId?: string;
+  malId?: number;
   /** Public title page. Source identity is assigned by the host, not this DTO. */
   webUrl?: string;
   subtitle?: string;

@@ -550,6 +550,13 @@ browser APIs or cookies.
 
 ### 5.1. Complete public context
 
+For intro and credits markers, include `originalTitle` and `year` when available.
+When `context.supportsExternalMediaIds === true`, a title may include an IMDb
+`imdbId` (for example `tt0903747`) and a positive integer MyAnimeList `malId`.
+Supply verified IDs from those services. Use `season` and `number` for each
+episode's season and number. The host looks up markers when the user enables
+this in player settings.
+
 Exact signatures and DTO fields are in `sdk/index.d.ts`. This is a contract
 reference, not an additional module to load from an installed package.
 

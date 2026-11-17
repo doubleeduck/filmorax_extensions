@@ -181,6 +181,7 @@ export default function createSource(context) {
         await context.html.extract(html, {
           fields: {
             title: { selector: '.b-post__title h1, h1', text: true },
+            original: { selector: '.b-post__origtitle', text: true },
             description: { selector: '.b-post__description_text, .postText', text: true },
             rating: { selector: '.b-post__rating,.ratingScore', text: true },
             json: {
@@ -420,6 +421,7 @@ export default function createSource(context) {
       id: 'hdrezka-' + encodeURIComponent(path),
       webUrl: new URL('/' + path + '.html', base).href,
       title,
+      originalTitle: text(data.original),
       kind: kind(path),
       subtitle: [released ? String(released) : '', ...tags.slice(0, 2)].filter(Boolean).join(' / '),
       overview: text(data.description).replace(/^Про что .+?:\s*/, ''),

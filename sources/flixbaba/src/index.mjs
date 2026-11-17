@@ -72,6 +72,7 @@ export default function createSource(context) {
       }),
       match[1],
       true,
+      context.supportsExternalMediaIds,
     );
   }
   async function videasy(uri) {

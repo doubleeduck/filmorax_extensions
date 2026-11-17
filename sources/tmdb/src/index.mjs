@@ -223,7 +223,7 @@ const names = (rows) => [
       .filter(Boolean),
   ),
 ];
-function mapItem(data, type, routes, details = false) {
+function mapItem(data, type, routes, details = false, externalIds = false) {
   const id = Number(data.id);
   if (!Number.isSafeInteger(id) || id < 0 || !['movie', 'tv'].includes(type)) return null;
   const tv = type === 'tv',
@@ -263,6 +263,9 @@ function mapItem(data, type, routes, details = false) {
     webUrl: `https://www.themoviedb.org/${type}/${id}`,
     title,
     originalTitle: original === title ? '' : original,
+    ...(externalIds && /^tt\d{7,12}$/.test(text(data.external_ids?.imdb_id ?? data.imdb_id))
+      ? { imdbId: text(data.external_ids?.imdb_id ?? data.imdb_id) }
+      : {}),
     subtitle: [
       year && String(year),
       tv ? 'TV' : 'Movie',
@@ -653,6 +656,7 @@ export default function createSource(context) {
       match[1],
       routes,
       true,
+      context.supportsExternalMediaIds,
     );
   }
   return {

@@ -40,6 +40,7 @@
       "network": {
         "origins": [
           "https://go3.kinogo.cc",
+          "https://api.embf.net",
           "https://nextembed.ws",
           "https://ortified.ws",
           "https://femd.ws",
@@ -52,6 +53,7 @@
         "imageOrigins": ["https://go3.kinogo.cc", "https://kinogo.cc"],
         "streamOrigins": [
           "https://interkh.com",
+          "https://api.embf.net",
           "https://nextembed.ws",
           "https://ortified.ws",
           "https://femd.ws",
@@ -87,6 +89,7 @@
       "sourceId": "kinogo",
       "schemes": ["collaps", "https", "http"],
       "origins": [
+        "https://api.embf.net",
         "https://nextembed.ws",
         "https://ortified.ws",
         "https://femd.ws",
