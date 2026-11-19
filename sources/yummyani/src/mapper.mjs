@@ -170,6 +170,7 @@ export function item(value, base, details = false) {
     title = pick(data, ['title', 'name', 'rus_name', 'eng_name']),
     id = slug(pick(data, ['anime_url', 'url', 'slug', 'id', 'anime_id']), base);
   if (!title || !id) return null;
+  const english = text(data.eng_name);
   const poster =
     typeof data.poster === 'string'
       ? text(data.poster)
@@ -184,7 +185,7 @@ export function item(value, base, details = false) {
     id: `yummyani-${id}`,
     webUrl: new URL('/catalog/item/' + encodeURIComponent(id), base).href,
     title,
-    originalTitle: pick(data, ['eng_name', 'original_title']),
+    originalTitle: first(english === title ? '' : english, data.original_title),
     subtitle: join([
       pick(data.type, ['title', 'name', 'label']),
       year ? String(year) : '',

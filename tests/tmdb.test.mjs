@@ -33,6 +33,42 @@ const movie = {
   genre_ids: [16],
 };
 
+test('TMDB uses the current app language for catalogue, search, details and cached credits', async () => {
+  const config = {};
+  const { source, calls } = fixture({
+    config,
+    response: (input) => {
+      const url = new URL(input.url);
+      const row = {
+        ...movie,
+        title: url.searchParams.get('language') === 'en-US' ? 'Film' : 'Фильм',
+        media_type: 'movie',
+      };
+      return { ...row, results: [row], cast: [row] };
+    },
+  });
+  const actorFilter = { selectedFilters: { actor: ['7'], section: ['movie'] } };
+  assert.equal((await source.search(actorFilter)).items[0].title, 'Фильм');
+  config.appLanguage = 'en';
+  assert.equal((await source.search(actorFilter)).items[0].title, 'Film');
+  assert.equal((await source.getPopular({})).items[0].title, 'Film');
+  assert.equal((await source.search({ searchTerm: 'Film' })).items[0].title, 'Film');
+  assert.equal((await source.loadDetails({ itemId: 'tmdb-movie-42' })).title, 'Film');
+  config.appLanguage = 'ru';
+  assert.equal((await source.search({ searchTerm: 'Фильм' })).items[0].title, 'Фильм');
+
+  const urls = calls.map(({ url }) => new URL(url));
+  assert.deepEqual(
+    urls.map((url) => url.searchParams.get('language')),
+    ['ru-RU', 'en-US', 'en-US', 'en-US', 'en-US', 'ru-RU'],
+  );
+  assert.ok(urls.every((url) => url.searchParams.get('region') === 'RU'));
+  assert.deepEqual(
+    urls.slice(0, 2).map((url) => url.pathname),
+    ['/3/person/7/combined_credits', '/3/person/7/combined_credits'],
+  );
+});
+
 test('director catalogue includes only directing jobs, merges movie/TV and intersects acting credits', async () => {
   const { source, calls } = fixture({
     response: (input) =>

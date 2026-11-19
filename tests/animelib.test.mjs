@@ -3,6 +3,15 @@ import assert from 'node:assert/strict';
 import createSource from '../sources/animelib/src/index.mjs';
 import { item, richText } from '../sources/animelib/src/mapper.mjs';
 
+test('AniLib keeps the Russian display title and reads the English or original lookup title', () => {
+  const data = { slug_url: '42-fixture', rus_name: 'Наруто', name: 'Naruto' };
+  const english = item({ ...data, eng_name: { ru: 'Наруто', en: 'Naruto English' } });
+  assert.equal(english.title, 'Наруто');
+  assert.equal(english.originalTitle, 'Naruto English');
+  assert.equal(item(data).originalTitle, 'Naruto');
+  assert.equal(item({ ...data, name: 'Наруто' }).originalTitle, '');
+});
+
 test('AniLib fetches related titles while episode lookup is pending', async () => {
   let release;
   const gate = new Promise((resolve) => {

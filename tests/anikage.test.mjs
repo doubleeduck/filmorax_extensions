@@ -42,6 +42,15 @@ const anime = {
   studios: [{ name: 'Studio', isAnimationStudio: true }],
 };
 
+test('Anikage uses the native title when the Romanized title is unavailable', async () => {
+  const { source } = fixture(() => ({
+    data: [{ ...anime, title: { english: 'Fixture', native: '日本語' } }],
+  }));
+  const result = await source.search({ searchTerm: 'Fixture' });
+  assert.equal(result.items[0].title, 'Fixture');
+  assert.equal(result.items[0].originalTitle, '日本語');
+});
+
 test('Anikage keeps every filter and exact API pagination/filter semantics', async () => {
   const { source, calls } = fixture(() => ({ data: [anime], hasNext: true }));
   const filters = source.getFilters();

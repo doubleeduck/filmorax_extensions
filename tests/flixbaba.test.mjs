@@ -5,6 +5,18 @@ import { decodeVidy } from '../sources/flixbaba/src/vidy.mjs';
 import { decryptUrls, wasmKeyCandidates } from '../sources/flixbaba/src/vsembed.mjs';
 import { item } from '../sources/flixbaba/src/mapper.mjs';
 import { flixbabaFixture } from './support/flixbaba_fixture.mjs';
+
+test('FlixBaba sends normalized explicit IMDb IDs only to supporting hosts', () => {
+  const data = { id: 603, title: 'Fixture', imdb_id: 'tt1234567' };
+  assert.equal(item(data, 'movie', true, true).imdbId, 'tt1234567');
+  assert.equal(
+    item({ ...data, external_ids: { imdb_id: ' tt7654321 ' } }, 'movie', true, true).imdbId,
+    'tt7654321',
+  );
+  assert.equal(item(data, 'movie', true).imdbId, undefined);
+  assert.equal(item({ ...data, imdb_id: '603' }, 'movie', true, true).imdbId, undefined);
+});
+
 const publicVector =
   '_ugkauLG68RJWI20rUQfzxtjBKZdEG5jbQuqABGwscTT4wuPOGA2jLj21zYcIJWdsP15GDwE6WZNPyfaUvqfoWMIDFrgtAsRanAk5GqYI1p9Aj0m5SmLl5hX8-jv_s7t88jO1-X7wgyGik58ObC5FjmZTxQdGc10fZ5UouZhMd9nnQhN3g';
 test('FlixBaba Vidy decoder matches the existing public mvm1 test vector', () => {

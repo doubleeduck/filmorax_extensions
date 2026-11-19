@@ -108,6 +108,8 @@ export function item(data, authorized = false, related = true) {
   const title = localized(data.rus_name ?? data.name ?? data.eng_name ?? data.title),
     id = first(data.slug_url, data.slug, data.id);
   if (!title || !id) return null;
+  const english = first(data.eng_name?.en, localized(data.eng_name));
+  const alternate = first(data.name?.en, localized(data.name));
   const release = first(data.releaseDate, data.releaseDateString, data.release_date),
     count =
       Number(
@@ -176,7 +178,7 @@ export function item(data, authorized = false, related = true) {
     id: `animelib-${id}`,
     webUrl: 'https://animelib.org/ru/anime/' + encodeURIComponent(id),
     title,
-    originalTitle: localized(data.eng_name),
+    originalTitle: first(english === title ? '' : english, alternate === title ? '' : alternate),
     kind: 'anime',
     subtitle: join([
       localized(data.type?.label ?? data.type?.name),

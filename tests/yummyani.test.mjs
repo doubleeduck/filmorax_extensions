@@ -3,6 +3,22 @@ import assert from 'node:assert/strict';
 import createSource from '../sources/yummyani/src/index.mjs';
 import { item } from '../sources/yummyani/src/mapper.mjs';
 
+test('YummyAni preserves a distinct original title when the English field duplicates the display title', () => {
+  const data = {
+    anime_url: 'fixture',
+    title: 'Наруто',
+    eng_name: 'Наруто',
+    original_title: 'Naruto',
+  };
+  const result = item(data, 'https://ru.yummyani.me');
+  assert.equal(result.title, 'Наруто');
+  assert.equal(result.originalTitle, 'Naruto');
+  assert.equal(
+    item({ ...data, eng_name: 'Naruto English' }, 'https://ru.yummyani.me').originalTitle,
+    'Naruto English',
+  );
+});
+
 test('large series classifies each iframe route once and preserves every video', () => {
   const NativeURL = globalThis.URL;
   let parses = 0;

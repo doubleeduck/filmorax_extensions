@@ -191,7 +191,7 @@ function item(data, overview, episodes, externalIds = false) {
     id: `anikage-${slug}`,
     webUrl: `https://anikage.cc/anime/info/${encodeURIComponent(slug)}`,
     title,
-    originalTitle: text(data.title?.romaji),
+    originalTitle: first(data.title?.romaji, data.title?.native),
     ...(externalIds && Number.isInteger(malId) && malId > 0 && malId <= 2147483647
       ? { malId }
       : {}),

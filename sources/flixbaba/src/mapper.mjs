@@ -130,6 +130,7 @@ export function item(data, type, details = false, externalIds = false) {
     tv = type === 'tv',
     title = first(data[tv ? 'name' : 'title'], data[tv ? 'original_name' : 'original_title']);
   if (!Number.isSafeInteger(id) || id < 0 || !title) return null;
+  const imdbId = first(data.external_ids?.imdb_id, data.imdb_id);
   const year =
       Number(/\b(?:19|20)\d{2}\b/.exec(text(data[tv ? 'first_air_date' : 'release_date']))?.[0]) ||
       null,
@@ -162,9 +163,7 @@ export function item(data, type, details = false, externalIds = false) {
     id: `flixbaba-${type}-${id}-${slug(title)}`,
     title,
     originalTitle: text(data[tv ? 'original_name' : 'original_title']),
-    ...(externalIds && /^tt\d{7,12}$/.test(text(data.external_ids?.imdb_id))
-      ? { imdbId: data.external_ids.imdb_id }
-      : {}),
+    ...(externalIds && /^tt\d{7,12}$/.test(imdbId) ? { imdbId } : {}),
     kind: tv ? 'series' : 'movie',
     subtitle: [
       year ? String(year) : '',

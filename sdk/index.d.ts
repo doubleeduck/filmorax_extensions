@@ -32,7 +32,12 @@ export interface SourceContext {
     get(key: string): Promise<Json>;
     set(key: string, value: Json): Promise<null>;
     /** User-owned app preferences; scripts cannot write them. */
-    network(): Promise<{ baseUrl: string; options: Record<string, string> }>;
+    network(): Promise<{
+      baseUrl: string;
+      options: Record<string, string>;
+      /** Effective FilmoraX interface language, when supplied by the host. */
+      appLanguage?: string;
+    }>;
   };
   readonly auth: {
     status(): Promise<{ authorized: boolean; revision: number }>;

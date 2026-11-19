@@ -134,6 +134,10 @@ const lampaImageMirrors = [
   'https://pl.imagetmdb.com',
   'https://lampa.byskaz.ru/tmdb/img',
 ];
+const tmdbLanguages = new Map([
+  ['en', 'en-US'],
+  ['ru', 'ru-RU'],
+]);
 const validMirror = (value) => {
   try {
     const url = new URL(value);
@@ -192,6 +196,7 @@ function routing(config, params) {
   return {
     api: (path) => apiUrls(path)[0],
     apiUrls,
+    language: tmdbLanguages.get(config.appLanguage) ?? params.language,
     autoLampa,
     publicLampa:
       apiMode === 'lampaProxy' &&
@@ -425,7 +430,7 @@ export default function createSource(context) {
     else accessToken ??= await credential(routes);
     const headers = { Accept: 'application/json' };
     params = {
-      language: context.parameters.language,
+      language: routes.language,
       region: context.parameters.region,
       ...params,
     };
@@ -491,7 +496,7 @@ export default function createSource(context) {
     const path = `/3/person/${person}/combined_credits`;
     const key = JSON.stringify([
       routes.api(path),
-      context.parameters.language,
+      routes.language,
       context.parameters.region,
       accessToken,
     ]);
